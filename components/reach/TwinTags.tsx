@@ -9,7 +9,7 @@ import { clamp, seg } from "@/lib/timing";
 import { CHOREO, CITIES, LEVEL, SLAB, STREAMS, type Focus, type ReachCity, type TwinClock } from "./data";
 
 /**
- * Screen-aligned annotations over the twin: element tags on HQ and the busiest
+ * Screen-aligned annotations over the site plan: keynoted tags on HQ and the busiest
  * cities, and a properties card for the active city. Opacity and placement are
  * written imperatively and only when they change: no React state per frame, and no
  * layout reads per frame (a ResizeObserver supplies the sizes).
@@ -122,6 +122,7 @@ function CityTag({ city, index, clock, focus }: TagProps) {
           </>
         ) : (
           <>
+            <span className="border-r border-cyan/40 pr-1.5 text-cyan">{city.note}</span>
             <span>{city.name}</span>
             <span className={STREAMS[city.stream].text}>{city.count}</span>
           </>
@@ -195,8 +196,11 @@ function Card({ city }: { city: ReachCity }) {
       {/* HQ is its own chip and the row wraps, so a long city name never runs out of its tag. */}
       <p className="flex flex-wrap items-center gap-2">
         <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${stream.fill}`} />
-        {city.isHQ && <span className="bim-tag text-red-glow">HQ</span>}
-        <span className="bim-tag">{city.name}</span>
+        {city.isHQ && <span className="bim-tag border-cyan/40 text-cyan">HQ</span>}
+        <span className="bim-tag">
+          <span className="text-cyan">{city.note}</span>
+          {city.name}
+        </span>
       </p>
       <p className="mono mt-2 text-[12px] text-mist">
         <span className={`font-semibold ${stream.text}`}>{city.count}</span> in progress

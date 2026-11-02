@@ -64,6 +64,14 @@ export function stepAt(p: number): number {
   return i;
 }
 
+/** Keynote number of step i, as the legend and the model's element tags print it: "01". */
+export const keynote = (i: number) => String(i + 1).padStart(2, "0");
+
+export type StepId = (typeof STEPS)[number]["id"];
+
+/** Keynote by step id, for the element tags in the model. */
+export const NOTE = Object.fromEntries(STEPS.map((s, i) => [s.id, keynote(i)])) as Record<StepId, string>;
+
 /** When everything happens, in scroll progress. Each part is a pure function of it, so scrubbing back un-builds exactly. */
 export const AT = {
   marksIn: [0.015, 0.07],

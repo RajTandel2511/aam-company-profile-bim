@@ -108,7 +108,7 @@ export default function Lightbox({ photos, start, onClose }: Props) {
       <div className="relative flex items-center justify-between gap-4 px-[var(--gutter)] pb-3 pt-4">
         <p id="work-lightbox-title" className="hud text-mist">
           <span aria-hidden>
-            Fig. {pad(index + 1)} <span className="text-fog">/ {pad(n)}</span>
+            <span className="text-cyan">Ref. {pad(index + 1)}</span> <span className="text-fog">/ {pad(n)}</span>
           </span>
           <span className="sr-only">
             Field photo {index + 1} of {n}
@@ -119,7 +119,7 @@ export default function Lightbox({ photos, start, onClose }: Props) {
           type="button"
           aria-label="Close photo viewer"
           onClick={onClose}
-          className="hud inline-flex h-11 items-center gap-3 rounded-full border border-hair bg-void/40 px-4 text-chalk transition-colors hover:border-chalk/50"
+          className="hud inline-flex h-11 items-center gap-3 rounded-full border border-hair bg-void/40 px-4 text-chalk transition-colors hover:border-cyan/60"
         >
           Close
           <span aria-hidden className="text-fog">
@@ -136,7 +136,7 @@ export default function Lightbox({ photos, start, onClose }: Props) {
         exit={{ scale: reduce ? 1 : motionTokens.scale.subtle }}
         transition={timing}
       >
-        <Ticks className="inset-0 text-chalk/30" />
+        <Ticks className="inset-0 text-cyan/50" />
         <AnimatePresence initial={false} custom={slideDir}>
           <motion.div
             key={index}

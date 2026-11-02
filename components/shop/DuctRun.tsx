@@ -9,6 +9,7 @@ import {
   BED,
   COLORS,
   CornerPiece,
+  EDGE_OPACITY,
   F,
   FlangeFrame,
   GAP,
@@ -35,7 +36,7 @@ import {
   type P2,
   type V3,
 } from "./parts";
-import { AT, flash, io, shop, shown } from "./sequence";
+import { AT, NOTE, flash, io, shop, shown } from "./sequence";
 
 /**
  * The shop sequence in 3D — rectangular duct only. Section A is folded from a flat
@@ -381,7 +382,7 @@ function Elbow() {
       <group ref={live}>
         <FlangeFrame w={W} h={H} />
         <mesh geometry={ELBOW_GEO.cheek} material={MAT.steel} position={[0, -T / 2, 0]}>
-          <Edges color={COLORS.edge} transparent opacity={0.45} />
+          <Edges color={COLORS.edge} transparent opacity={EDGE_OPACITY} />
         </mesh>
         {/* heel (outer walls) and throat (inner walls) */}
         <Plate size={[E + W, H, T]} position={[(E + W) / 2, H / 2, W / 2]} />
@@ -396,11 +397,11 @@ function Elbow() {
       <instancedMesh ref={vanes} args={[ELBOW_GEO.vane, vaneMat, VANES]} frustumCulled={false} />
       <group ref={top}>
         <mesh geometry={ELBOW_GEO.cheek} material={ghost} position={[0, H - T / 2, 0]}>
-          <Edges color={COLORS.edge} transparent opacity={0.55} />
+          <Edges color={COLORS.edge} transparent opacity={EDGE_OPACITY + 0.1} />
         </mesh>
         <Plate size={[RUNNER_LEN, RUNNER, 0.03]} position={[E + W / 2, H - RUNNER / 2, 0]} rotation={[0, -Q / 2, 0]} material={ghost} />
       </group>
-      <Tag position={[E + W / 2, H, 0]} show={(p) => shown(p, AT.tagVanes)}>
+      <Tag position={[E + W / 2, H, 0]} show={(p) => shown(p, AT.tagVanes)} note={NOTE.elbow}>
         Turning vanes
       </Tag>
     </>
@@ -446,7 +447,7 @@ function Transition() {
   return (
     <group ref={live}>
       <mesh geometry={TR_GEO} material={MAT.steel2}>
-        <Edges color={COLORS.edge} transparent opacity={0.45} />
+        <Edges color={COLORS.edge} transparent opacity={EDGE_OPACITY} />
       </mesh>
       <FlangeFrame w={W} h={H} />
       <group position={[LT, 0, 0]} scale={[-1, 1, 1]}>
@@ -535,10 +536,10 @@ function SlipDrive() {
     <group ref={root} position={SD} visible={false}>
       <SmallTube x0={-LS} />
       <mesh geometry={SD_GEO.slip} material={MAT.steel} position={[0, HS, 0]}>
-        <Edges color={COLORS.edge} transparent opacity={0.45} />
+        <Edges color={COLORS.edge} transparent opacity={EDGE_OPACITY} />
       </mesh>
       <mesh geometry={SD_GEO.slip} material={MAT.steel} scale={[1, -1, 1]}>
-        <Edges color={COLORS.edge} transparent opacity={0.45} />
+        <Edges color={COLORS.edge} transparent opacity={EDGE_OPACITY} />
       </mesh>
       <Arrive during={AT.sdSlide} from={[0.4, 0, 0]}>
         <SmallTube x0={0} />
@@ -563,7 +564,7 @@ function SlipDrive() {
         ))}
       </group>
       <Glow geometry={SD_GEO.glow} amount={(p) => flash(p, AT.sdGlow)} />
-      <Tag position={[0, HS, WS / 2]} show={(p) => shown(p, AT.tagSd)}>
+      <Tag position={[0, HS, WS / 2]} show={(p) => shown(p, AT.tagSd)} note={NOTE.joining}>
         {"S&D · Slip & drive"}
       </Tag>
     </group>
@@ -634,22 +635,22 @@ export function DuctRun({ reduce }: { reduce: boolean }) {
             </group>
           </Arrive>
 
-          <Tag position={[0.18, RUN_Y + 0.002, -0.78]} show={(p) => shown(p, AT.tagBlank)}>
+          <Tag position={[0.18, RUN_Y + 0.002, -0.78]} show={(p) => shown(p, AT.tagBlank)} note={NOTE.blank}>
             Galvanized blank
           </Tag>
-          <Tag position={[0.35, RUN_Y + H, -W / 2]} show={(p) => shown(p, AT.tagFold)}>
+          <Tag position={[0.35, RUN_Y + H, -W / 2]} show={(p) => shown(p, AT.tagFold)} note={NOTE.folds}>
             {"Brake fold · 90°"}
           </Tag>
-          <Tag position={[0.12, RUN_Y + WALL, W / 2 + POCKET]} show={(p) => shown(p, AT.tagSeam)}>
+          <Tag position={[0.12, RUN_Y + WALL, W / 2 + POCKET]} show={(p) => shown(p, AT.tagSeam)} note={NOTE.pittsburgh}>
             Pittsburgh lock
           </Tag>
-          <Tag position={[L / 2, RUN_Y + H + F, W / 2 + F / 2]} show={(p) => shown(p, AT.tagTdc)}>
+          <Tag position={[L / 2, RUN_Y + H + F, W / 2 + F / 2]} show={(p) => shown(p, AT.tagTdc)} note={NOTE.tdc}>
             TDC flange
           </Tag>
-          <Tag position={[L / 2 + GAP / 2, RUN_Y + H + F / 2, W / 2 + F / 2]} show={(p) => shown(p, AT.tagGasket)}>
+          <Tag position={[L / 2 + GAP / 2, RUN_Y + H + F / 2, W / 2 + F / 2]} show={(p) => shown(p, AT.tagGasket)} note={NOTE.joining}>
             {"Gasket · corner bolts"}
           </Tag>
-          <Tag position={[L + GAP, RUN_Y + H + F + 0.02, 0]} show={(p) => shown(p, AT.tagDone)}>
+          <Tag position={[L + GAP, RUN_Y + H + F + 0.02, 0]} show={(p) => shown(p, AT.tagDone)} note={NOTE.finished}>
             Fabricated in South San Francisco
           </Tag>
         </group>

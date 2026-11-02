@@ -8,14 +8,18 @@ import { COLORS } from "./materials";
 import { bim } from "./store";
 import { CHAPTERS } from "./timeline";
 
-/** One scan per trade chapter, in that trade's legend colour. */
+/** One scan per trade chapter, in that trade's legend colour (boosted once here, so frames only copy). */
 const SCANS = [
-  { id: "sheetmetal", color: COLORS.sheetMetal },
+  { id: "sheetmetal", color: COLORS.ice },
   { id: "hvac", color: COLORS.supplyGlow },
   { id: "exhaust", color: COLORS.exhaustGlow },
-  { id: "controls", color: COLORS.signal },
-  { id: "maintenance", color: COLORS.signal },
-].map((s) => ({ ...s, start: CHAPTERS.find((c) => c.id === s.id)?.range[0] ?? 0 }));
+  { id: "controls", color: COLORS.amber },
+  { id: "maintenance", color: COLORS.violetGlow },
+].map((s) => ({
+  start: CHAPTERS.find((c) => c.id === s.id)?.range[0] ?? 0,
+  fill: new THREE.Color(s.color).multiplyScalar(1.6),
+  line: new THREE.Color(s.color).multiplyScalar(2.6),
+}));
 
 /** Share of story progress a scan takes to rise from grade to above the roof. */
 const SPAN = 0.04;
@@ -50,14 +54,17 @@ export default function ChapterScan() {
   useFrame(() => {
     const g = group.current;
     if (!g) return;
-    const scan = bim.reduced ? undefined : SCANS.find((s) => bim.story >= s.start && bim.story <= s.start + SPAN);
+    let scan: (typeof SCANS)[number] | undefined;
+    for (let i = 0; i < SCANS.length && !scan && !bim.reduced; i++) {
+      if (bim.story >= SCANS[i].start && bim.story <= SCANS[i].start + SPAN) scan = SCANS[i];
+    }
     g.visible = !!scan;
     if (!scan) return;
     const t = seg(bim.story, scan.start, scan.start + SPAN);
     g.position.y = easeInOutCubic(t) * FOOT.top;
     const a = Math.sin(Math.PI * t);
-    fill.color.set(scan.color).multiplyScalar(1.6);
-    line.color.set(scan.color).multiplyScalar(2.6);
+    fill.color.copy(scan.fill);
+    line.color.copy(scan.line);
     fill.opacity = 0.14 * a;
     line.opacity = a;
   });

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { useFrame } from "@react-three/fiber";
 import { CURTAIN_Z, FLOORS, LEVELS, MULLION_STEP, SLAB, SLAB_T } from "../geometry";
-import { ARCH, CLIP, GLOW } from "../materials";
+import { ARCH, CLIP, GLOW, copyFinish } from "../materials";
 import { bim } from "../store";
 import { INTRO, arrive, ease, stagger, type Window } from "../timeline";
 import { merge, setBox } from "./structure/build";
@@ -73,8 +73,9 @@ function glassFloor(f: number): THREE.BufferGeometry {
 
 /**
  * A floor's glass while it fades in. ARCH.glass is shared (X-ray drives its
- * opacity), so the fade runs on a copy that tracks it — opacity x fade, same
- * section plane — and the mesh switches back to ARCH.glass once fully in.
+ * opacity, the visual style its finish), so the fade runs on a copy that tracks
+ * it — finish, visibility, opacity x fade, same section plane — and the mesh
+ * switches back to ARCH.glass once fully in.
  */
 function fadeMaterial(): THREE.MeshStandardMaterial {
   const m = ARCH.glass.clone();
@@ -150,8 +151,11 @@ export default function Envelope() {
       if (k >= 1) {
         pane.material = ARCH.glass;
       } else {
-        assets.fades[f].opacity = ARCH.glass.opacity * k;
-        pane.material = assets.fades[f];
+        const fade = assets.fades[f];
+        copyFinish(fade, ARCH.glass); // the style may repaint the glass mid-fade
+        fade.visible = ARCH.glass.visible;
+        fade.opacity = ARCH.glass.opacity * k;
+        pane.material = fade;
       }
     }
   });

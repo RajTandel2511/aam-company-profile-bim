@@ -6,24 +6,34 @@ import { useFrame } from "@react-three/fiber";
 import { SVGLoader } from "three/examples/jsm/loaders/SVGLoader.js";
 import { COUNTIES, project } from "@/lib/bayarea";
 import { easeOutCubic, seg } from "@/lib/timing";
-import { CHOREO, HQ, MAX_REACH, ORIGIN, SLAB, TWIN_COLORS, WORLD_SCALE, toWorld, type TwinClock } from "./data";
+import {
+  CHOREO,
+  HQ,
+  LATS,
+  LAT_SPAN,
+  LONS,
+  LON_SPAN,
+  MAX_REACH,
+  ORIGIN,
+  SLAB,
+  TWIN_COLORS,
+  WORLD_SCALE,
+  toWorld,
+  type TwinClock,
+} from "./data";
 
 /**
- * The ground of the twin: a quarter-degree graticule (the empty viewport grid),
- * then the counties as thin halftone slabs that rise out of it in a wave from HQ.
- * Water stays the void.
+ * The ground of the site plan: a quarter-degree graticule (the empty viewport grid),
+ * then the counties as thin deep-navy halftone slabs with cyan county lines, rising out
+ * of it in a wave from HQ. Water stays the void.
  */
 
 const DOT_CELL = 0.09; // halftone pitch, world units
-const DOT_MIX = 0.16;
-const EDGE_OPACITY = 0.24;
+const DOT_MIX = 0.14;
+const EDGE_OPACITY = 0.55;
 const EDGE_LIFT = 0.002;
 const GRID_OPACITY = 0.55;
 const GRID_Y = -0.004;
-const LATS = [36.75, 37, 37.25, 37.5, 37.75, 38, 38.25, 38.5, 38.75];
-const LONS = [-123, -122.75, -122.5, -122.25, -122, -121.75, -121.5, -121.25];
-const LAT_SPAN = [36.6, 38.9] as const;
-const LON_SPAN = [-123.3, -120.9] as const;
 /** The scan ring that sweeps out from HQ while the counties rise. */
 const SCAN_REACH = MAX_REACH * 1.15;
 const SCAN_WIDTH = 0.35;

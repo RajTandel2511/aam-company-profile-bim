@@ -15,18 +15,30 @@
 
 @layer base {
   :root {
-    /* dark surfaces */
-    --void-rgb: 9 11 14; /* #090B0E page */
-    --deep-rgb: 13 16 20; /* #0D1014 alternate section */
-    --panel-rgb: 20 24 29; /* #14181D raised panel */
-    --raised-rgb: 28 33 40; /* #1C2128 hover / second level */
-    --hair-rgb: 42 49 58; /* #2A313A hairlines */
+    /* surfaces — deep navy, a BIM viewport at night */
+    --void-rgb: 4 7 13; /* #04070D page */
+    --deep-rgb: 7 12 22; /* #070C16 alternate section */
+    --panel-rgb: 11 18 32; /* #0B1220 raised panel */
+    --raised-rgb: 17 27 46; /* #111B2E hover / second level */
+    --hair-rgb: 30 44 70; /* #1E2C46 hairlines */
 
-    /* text on dark (contrast on void) */
-    --chalk-rgb: 236 240 244; /* #ECF0F4 primary   ~17:1 */
-    --mist-rgb: 196 204 213; /* #C4CCD5 secondary ~12:1 */
-    --fog-rgb: 138 148 160; /* #8A94A0 muted      ~6.3:1 */
-    --signal-rgb: 230 238 245; /* controls lines in the model */
+    /* text (contrast on void) */
+    --chalk-rgb: 232 241 255; /* #E8F1FF primary   ~18:1 */
+    --mist-rgb: 176 195 222; /* #B0C3DE secondary ~11.5:1 */
+    --fog-rgb: 125 144 176; /* #7D90B0 muted      ~6.3:1 (5.8:1 on panel) */
+    --signal-rgb: 255 181 71; /* #FFB547 EMS / controls (amber) */
+
+    /* BIM accents */
+    --cyan-rgb: 56 225 255; /* #38E1FF holo linework, selection, UI accent */
+    --amber-rgb: 255 181 71; /* #FFB547 controls, warnings */
+    --violet-rgb: 139 124 255; /* #8B7CFF maintenance, detail callouts (fills) */
+    --violet-glow-rgb: 185 176 255; /* #B9B0FF small violet text */
+    --ice-rgb: 201 231 246; /* #C9E7F6 architectural sheet metal */
+
+    /* MEP systems — vivid versions of the logo's three streams */
+    --supply-rgb: 46 139 255; /* #2E8BFF supply air */
+    --return-rgb: 255 77 109; /* #FF4D6D return air */
+    --exhaust-rgb: 43 255 136; /* #2BFF88 exhaust / outside air */
 
     /* light surfaces (kept for print-like moments) */
     --paper-rgb: 245 245 242;
@@ -42,9 +54,9 @@
     --red-ink-rgb: 196 43 33; /* white on it 5.6:1 */
     --blue-ink-rgb: 0 107 171;
     --green-ink-rgb: 0 125 53;
-    --red-glow-rgb: 240 88 77; /* #F0584D text on void 5.4:1 */
-    --blue-glow-rgb: 63 163 230; /* #3FA3E6 text on void 6.6:1 */
-    --green-glow-rgb: 47 203 110; /* #2FCB6E text on void 8.6:1 */
+    --red-glow-rgb: 255 129 153; /* #FF8199 small red text on void ~8:1 */
+    --blue-glow-rgb: 111 182 255; /* #6FB6FF small blue text on void ~9:1 */
+    --green-glow-rgb: 125 255 181; /* #7DFFB5 small green text on void ~15:1 */
 
     --paper: rgb(var(--paper-rgb));
     --white: rgb(var(--white-rgb));
@@ -71,6 +83,8 @@
 
     --gutter: 20px;
     --nav-h: 64px;
+    /* fixed BIM status bar at the bottom (desktop only) — pinned views subtract it */
+    --status-h: 0px;
     --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
     --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
 
@@ -81,6 +95,7 @@
     :root {
       --gutter: 48px;
       --nav-h: 72px;
+      --status-h: 30px;
     }
   }
 
@@ -111,7 +126,7 @@
   }
 
   :focus-visible {
-    outline: 2px solid var(--blue-glow);
+    outline: 2px solid rgb(var(--cyan-rgb));
     outline-offset: 3px;
   }
 
@@ -251,11 +266,13 @@
     white-space: nowrap;
   }
 
-  /* Faint drafting grid for dark sections. */
+  /* Drafting grid for dark sections: a fine 24px cell and a brighter 96px major line, in BIM cyan. */
   .blueprint {
-    background-image: linear-gradient(rgb(var(--hair-rgb) / 0.45) 1px, transparent 1px),
-      linear-gradient(90deg, rgb(var(--hair-rgb) / 0.45) 1px, transparent 1px);
-    background-size: 48px 48px;
+    background-image: linear-gradient(rgb(var(--cyan-rgb) / 0.07) 1px, transparent 1px),
+      linear-gradient(90deg, rgb(var(--cyan-rgb) / 0.07) 1px, transparent 1px),
+      linear-gradient(rgb(var(--hair-rgb) / 0.35) 1px, transparent 1px),
+      linear-gradient(90deg, rgb(var(--hair-rgb) / 0.35) 1px, transparent 1px);
+    background-size: 96px 96px, 96px 96px, 24px 24px, 24px 24px;
     background-position: -1px -1px;
   }
 

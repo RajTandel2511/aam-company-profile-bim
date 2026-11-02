@@ -5,6 +5,7 @@ import type { Config } from "tailwindcss";
 const channel = (name: string) => `rgb(var(--${name}-rgb) / <alpha-value>)`;
 const names = [
   "void", "deep", "panel", "raised", "hair", "chalk", "mist", "fog", "signal",
+  "cyan", "amber", "violet", "violet-glow", "ice", "supply", "return", "exhaust",
   "paper", "white", "ink", "graphite", "silver",
   "red", "blue", "green", "red-ink", "blue-ink", "green-ink", "red-glow", "blue-glow", "green-glow",
 ];

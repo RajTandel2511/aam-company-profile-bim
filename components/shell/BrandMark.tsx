@@ -8,9 +8,9 @@ import { motionTokens } from "@/lib/motion-tokens";
 const useIsoLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
 
 /**
- * LogoMark strokes its ring with var(--graphite), which globals.css never
- * defines (only --graphite-rgb), so the ring would not paint at all. Scope the
- * variable to the logo's light grey, which reads on the void.
+ * LogoMark strokes its ring with var(--graphite): the logo's dark grey, about
+ * 3:1 on the navy void, so the ring all but disappears. Scope the variable to
+ * the logo's light grey, which reads on every dark surface of the set.
  */
 const LIGHT_RING = { "--graphite": "rgb(var(--silver-rgb))" } as CSSProperties;
 

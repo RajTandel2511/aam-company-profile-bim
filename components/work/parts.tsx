@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import { motionTokens, springs } from "@/lib/motion-tokens";
 
-/** A field photo prepared for the reel and the lightbox: content.ts facts + the served URL and pixel size. */
+/** A field photo prepared for the reference sheet and the lightbox: content.ts facts + the served URL and pixel size. */
 export type ReelPhoto = { src: string; url: string; alt: string; project: string; w: number; h: number };
 
 /** Two-digit readout, BIM-schedule style: 7 -> "07". */
@@ -47,41 +47,23 @@ export const Cross = () => (
     <path d="M3.5 3.5l9 9M12.5 3.5l-9 9" />
   </svg>
 );
-export const PauseGlyph = () => (
-  <svg {...ICON} width={12} height={12}>
-    <path d="M5 3v10M11 3v10" strokeWidth={2} />
-  </svg>
-);
-export const PlayGlyph = () => (
-  <svg {...ICON} width={12} height={12} fill="currentColor" stroke="none">
-    <path d="M4.5 2.5l9 5.5-9 5.5z" />
-  </svg>
-);
-
 type RoundButtonProps = {
   label: string;
   onClick: () => void;
-  isDisabled?: boolean;
-  controls?: string;
   children: ReactNode;
 };
 
-/**
- * Round hairline icon button. Uses aria-disabled rather than disabled so a focused
- * button reaching the end of the reel keeps focus instead of dropping it to <body>.
- */
-export function RoundButton({ label, onClick, isDisabled = false, controls, children }: RoundButtonProps) {
+/** Round hairline icon button (the lightbox's previous / next). */
+export function RoundButton({ label, onClick, children }: RoundButtonProps) {
   const reduce = useReducedMotion();
   return (
     <motion.button
       type="button"
       aria-label={label}
-      aria-controls={controls}
-      aria-disabled={isDisabled}
-      onClick={isDisabled ? undefined : onClick}
-      whileTap={isDisabled || reduce ? undefined : { scale: motionTokens.scale.press }}
+      onClick={onClick}
+      whileTap={reduce ? undefined : { scale: motionTokens.scale.press }}
       transition={springs.snappy}
-      className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-hair bg-void/40 text-chalk transition-colors hover:border-chalk/50 hover:bg-chalk/5 aria-disabled:cursor-not-allowed aria-disabled:opacity-35 aria-disabled:hover:border-hair aria-disabled:hover:bg-void/40"
+      className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-hair bg-void/40 text-chalk transition-colors hover:border-cyan/60 hover:bg-cyan/5"
     >
       {children}
     </motion.button>

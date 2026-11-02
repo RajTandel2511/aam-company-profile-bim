@@ -16,7 +16,7 @@ import {
   PARAPET,
   type V3,
 } from "../geometry";
-import { COLORS } from "../materials";
+import { ARCH, COLORS } from "../materials";
 import { bim } from "../store";
 import { INTRO, STORY, ease, stagger, type Window } from "../timeline";
 import { dashGeometry, dashLine, revealed, type Dash } from "./structure/build";
@@ -154,7 +154,8 @@ export default function Annotations() {
     if (lines.current) lines.current.visible = n > 0;
 
     camera.getWorldPosition(EYE);
-    const solid = 1 - bim.xray; // a ghosted building hides nothing
+    // a ghosted building hides nothing; nor does a see-through visual style (holo fills, wire)
+    const solid = Math.min(1 - bim.xray, ARCH.concrete.opacity);
     for (let i = 0; i < MARKS.length; i++) {
       const m = MARKS[i];
       want.current[i] = ease(p, m.w) * dim * (1 - hiddenBy(EYE, m.at) * solid);

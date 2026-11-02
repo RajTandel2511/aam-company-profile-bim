@@ -36,8 +36,9 @@ const SHELL = glowGradient(
     return t <= LEAD ? (t / LEAD) ** 2 : 0;
   },
 );
+/** the BIM accent: the band reads as the model's own scan, apart from every trade colour */
 const shellMat = new THREE.MeshBasicMaterial({
-  color: new THREE.Color(COLORS.signal).multiplyScalar(1.6),
+  color: new THREE.Color(COLORS.cyan).multiplyScalar(1.6),
   vertexColors: true,
   transparent: true,
   opacity: 0,
@@ -55,7 +56,7 @@ const LOOP: V3[] = [
   [-1, 0, 1],
   [-1, 0, -1],
 ];
-const LASER = new THREE.Color(COLORS.signal).multiplyScalar(2.4);
+const LASER = new THREE.Color(COLORS.cyan).multiplyScalar(2.4);
 
 export default function Finale() {
   const band = useRef<THREE.Group>(null);

@@ -31,7 +31,7 @@ const dustFrag = /* glsl */ `
   void main() {
     float d = length(gl_PointCoord - 0.5);
     float a = smoothstep(0.5, 0.0, d);
-    gl_FragColor = vec4(vec3(0.62, 0.78, 1.0) * 1.3, a * a * uOpacity * vFade);
+    gl_FragColor = vec4(vec3(0.55, 0.86, 1.0) * 1.3, a * a * uOpacity * vFade);
   }
 `;
 
@@ -41,7 +41,7 @@ const glowFrag = /* glsl */ `
   void main() {
     float d = length(vUv - 0.5) * 2.0;
     float g = pow(max(0.0, 1.0 - d), 2.4);
-    gl_FragColor = vec4(vec3(0.05, 0.32, 0.6) * g * uStrength, 1.0);
+    gl_FragColor = vec4(vec3(0.03, 0.34, 0.62) * g * uStrength, 1.0);
   }
 `;
 const glowVert = /* glsl */ `
@@ -50,9 +50,9 @@ const glowVert = /* glsl */ `
 `;
 
 /**
- * Air you can see: slow-rising dust motes catching the light around the model,
- * and a soft blue glow pooling under the building like a site lamp. Both are
- * GPU-only (one draw call each) and freeze with the motion pause (bim.time).
+ * Air you can see: slow-rising cyan dust motes catching the light around the
+ * model, and a soft cyan-blue glow pooling under the building like a site lamp.
+ * Both are GPU-only (one draw call each) and freeze with the motion pause (bim.time).
  */
 export default function Atmosphere() {
   const dust = useRef<THREE.Points>(null);

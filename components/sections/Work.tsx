@@ -1,51 +1,55 @@
-import { activeByCity, pastProjects, stats } from "@/lib/content";
+import { activeByCity, equipmentBrands, pastProjects, stats } from "@/lib/content";
+import { ViewFrame } from "@/components/bimui/ViewFrame";
 import { Reveal } from "@/components/ui/Reveal";
-import { SectionHeader } from "@/components/ui/SectionHeader";
-import BrandMarquee from "@/components/work/BrandMarquee";
-import PhotoReel from "@/components/work/PhotoReel";
-import ProjectGrid from "@/components/work/ProjectGrid";
+import { viewFrame } from "@/components/shell/site";
+import ProjectSchedule from "@/components/work/ProjectSchedule";
+import ReferenceSheet from "@/components/work/ReferenceSheet";
 
-/** All active jobs; the grid shows a curated, clearly named subset of them. */
+/** All active jobs; the schedule lists a curated, clearly named subset of them. */
 const activeTotal = Object.values(activeByCity).reduce((a, b) => a + b, 0);
 /** "As of …" for the job data, read from the stat that counts the same jobs (dropped if they diverge). */
 const asOf = stats.find((s) => s.value === activeTotal)?.note;
-const completed = new Intl.ListFormat("en", { style: "long", type: "conjunction" }).format(pastProjects);
+const and = new Intl.ListFormat("en", { style: "long", type: "conjunction" });
+
+/** The sheet's general notes. Brand NAMES only, as plain text — never logos. */
+const NOTES = [
+  { label: "Completed work", text: `Includes ${and.format(pastProjects)}.` },
+  { label: "Manufacturers", text: `We install equipment from ${and.format(equipmentBrands)}.` },
+];
 
 /**
- * 04 · Work. Current projects (all in progress) behind a sector filter, field photos on
- * a draggable reel with a lightbox, completed work, and the equipment brands we install.
- * Opaque, so it scrolls over the fixed 3D stage.
+ * 04 · Saved view "Project schedule" (G-201): the current projects as a sortable,
+ * filterable BIM schedule, the field photos as reference images, then the sheet's
+ * general notes. Opaque (ViewFrame), so it scrolls over the fixed 3D stage.
  */
 export default function Work() {
   return (
-    <section id="work" aria-labelledby="work-title" className="relative border-t border-hair bg-deep">
-      <div
-        aria-hidden
-        className="blueprint pointer-events-none absolute inset-x-0 top-0 h-[36rem] opacity-50 [mask-image:linear-gradient(to_bottom,#000,transparent)]"
-      />
+    <ViewFrame
+      {...viewFrame("work")}
+      intro={`A selection of the ${activeTotal} jobs our crews have in progress right now — hotels, stores, schools, housing, restaurants and civic work. Filter by sector or sort any column.`}
+    >
+      <ProjectSchedule asOf={asOf} />
+      <ReferenceSheet />
 
-      <div className="container-x relative pt-28 md:pt-36">
-        <SectionHeader
-          id="work-title"
-          index="04"
-          kicker="Work · Current projects"
-          title="On site across the Bay, right now."
-          intro={`A selection of the ${activeTotal} jobs our crews have in progress — hotels, stores, schools, housing, restaurants and civic work. Filter by sector.`}
-        />
-        <ProjectGrid asOf={asOf} />
-        <Reveal className="mt-14 border-t border-hair pt-6 md:mt-16">
-          <p className="text-[17px] leading-relaxed text-chalk">
-            <span className="eyebrow mr-4 text-fog">Completed work includes</span>
-            <span className="font-semibold">{completed}.</span>
-          </p>
-        </Reveal>
-      </div>
-
-      <PhotoReel />
-
-      <div className="container-x relative pb-28 pt-20 md:pb-36 md:pt-24">
-        <BrandMarquee />
-      </div>
-    </section>
+      <Reveal className="mt-20 md:mt-24">
+        <h3 className="hud text-chalk">General notes</h3>
+        <ol className="mt-4 grid gap-px border border-hair bg-hair md:grid-cols-2">
+          {NOTES.map((n, i) => (
+            <li key={n.label} className="flex gap-4 bg-void p-5 md:p-6">
+              <span
+                aria-hidden
+                className="mono grid h-7 w-7 shrink-0 place-items-center border border-cyan/70 text-[12px] font-semibold text-cyan"
+              >
+                {i + 1}
+              </span>
+              <p>
+                <span className="hud block text-fog">{n.label}</span>
+                <span className="mt-2 block text-lg font-semibold leading-snug text-chalk">{n.text}</span>
+              </p>
+            </li>
+          ))}
+        </ol>
+      </Reveal>
+    </ViewFrame>
   );
 }

@@ -2,15 +2,19 @@
 
 import { useEffect, useRef, useState, type PointerEvent, type ReactNode, type RefObject } from "react";
 import { motion, useInView, useReducedMotion, useSpring, type Variants } from "motion/react";
-import { company, contact } from "@/lib/content";
+import { BUILD_YEAR, company, contact } from "@/lib/content";
 import { useMotionPaused } from "@/lib/motion-pause";
 import { motionTokens, springs } from "@/lib/motion-tokens";
 import { clamp } from "@/lib/timing";
 import { LOGO_TAILS, LOGO_VIEWBOX } from "@/components/brand/LogoMark";
+import { Panel } from "@/components/bimui/Panel";
+import { ViewFrame } from "@/components/bimui/ViewFrame";
 import { Reveal } from "@/components/ui/Reveal";
-import { SectionHeader } from "@/components/ui/SectionHeader";
 import { BrandMark } from "@/components/shell/BrandMark";
-import { BID_HREF, TRI_BAR } from "@/components/shell/site";
+import { Stamp } from "@/components/shell/Stamp";
+import { BID_HREF, STREAM_FILLS, viewFrame } from "@/components/shell/site";
+
+const VIEW = viewFrame("contact");
 
 /*
  * The streams band. The three streams and the mark share one coordinate system
@@ -34,6 +38,8 @@ const MARK_BOX = {
 const RUN_IN = -900;
 const ENTRY = [0.12, 0.5, 0.88]; // where each stream enters, as a share of the band height
 const COLORS = ["var(--blue)", "var(--green)", "var(--red)"];
+/** The logo's streams read as the model's three airflows (STREAM_FILLS order). */
+const STREAM_TAGS = ["Supply air", "Exhaust / outside air", "Return air"];
 const STREAM_W = 15 * K; // a ribbon's thickness at its tail, in band units
 const r1 = (n: number) => Math.round(n * 10) / 10;
 
@@ -62,100 +68,108 @@ const FLOW: Variants = {
 const PULL = 0.3; // share of the pointer's offset the magnetic button follows
 
 const MAPS_HREF = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${contact.street}, ${contact.city}`)}`;
+const LINK =
+  "rounded-sm underline decoration-chalk/30 underline-offset-4 transition-colors hover:text-cyan hover:decoration-cyan";
 
-const SCHEDULE: { k: string; v: ReactNode; href?: string }[] = [
+/** The transmittal: from the visitor's project team to AAM, with every way to reach the office. */
+const TRANSMITTAL: { k: string; v: ReactNode }[] = [
+  { k: "To", v: company.name },
+  { k: "From", v: "Your project team" },
+  { k: "Re", v: "Bid request — drawings & specs" },
+  {
+    k: "Phone",
+    v: (
+      <a href={contact.phoneHref} className={LINK}>
+        {contact.phone}
+      </a>
+    ),
+  },
+  {
+    k: "Email",
+    v: (
+      <a href={`mailto:${contact.email}`} className={`${LINK} [overflow-wrap:anywhere]`}>
+        {contact.email}
+      </a>
+    ),
+  },
   {
     k: "Office",
     v: (
-      <>
+      <a href={MAPS_HREF} target="_blank" rel="noopener noreferrer" className={LINK}>
         {contact.street}
         <br />
         {contact.city}
-      </>
+        <span className="sr-only"> (opens map in a new tab)</span>
+      </a>
     ),
-    href: MAPS_HREF,
   },
   { k: "Hours", v: contact.hours },
   { k: "Fax", v: contact.fax },
 ];
 
+/**
+ * 06 · Saved view "Issued for bid" (G-301): the closing line, a big magnetic
+ * "Send us the drawings" CTA and a stamped transmittal with every contact route,
+ * then the logo's three streams drawing into the mark.
+ */
 export default function Contact() {
   return (
-    <section
-      id="contact"
-      aria-labelledby="contact-title"
-      className="relative overflow-hidden border-t border-hair bg-deep py-24 md:py-36"
-    >
-      <div className="container-x relative">
-        <SectionHeader
-          id="contact-title"
-          index="06"
-          kicker="Contact · Send us the plans"
-          title={`${company.tagline}.`}
-          intro="HVAC, exhaust and outside air, EMS controls, maintenance and architectural sheet metal — send the drawings and specs, and we will put a bid together."
-          className="[&_h2]:max-w-[12ch] [&_h2]:text-[clamp(3rem,9.5vw,8.5rem)]"
-        />
-
-        <Reveal delay={motionTokens.duration.normal} className="mt-10 flex flex-wrap items-center gap-x-8 gap-y-4">
-          <MagneticCta href={BID_HREF}>
-            Request a bid
-            <Arrow />
-          </MagneticCta>
-          <p className="text-mist">
-            or call{" "}
-            <a
-              href={contact.phoneHref}
-              className="rounded-sm font-semibold text-chalk underline decoration-chalk/30 underline-offset-4 transition-colors hover:decoration-chalk"
-            >
-              {contact.phone}
-            </a>
+    <ViewFrame {...VIEW}>
+      <div className="grid gap-14 lg:grid-cols-12 lg:gap-10">
+        <Reveal className="lg:col-span-7">
+          <p className="display max-w-[11ch] text-[clamp(2.9rem,8.4vw,7.25rem)] text-chalk">{company.tagline}.</p>
+          <p className="mt-7 max-w-xl text-[17px] leading-relaxed text-mist md:text-lg">
+            HVAC, exhaust and outside air, EMS controls, maintenance and architectural sheet metal — send the drawings and
+            specs, and we will put a bid together.
           </p>
+          <div className="mt-10 flex flex-wrap items-center gap-x-8 gap-y-4">
+            <MagneticCta href={BID_HREF}>
+              Send us the drawings
+              <Arrow />
+            </MagneticCta>
+            <p className="text-mist">
+              or call{" "}
+              <a href={contact.phoneHref} className={`${LINK} font-semibold text-chalk`}>
+                {contact.phone}
+              </a>
+            </p>
+          </div>
         </Reveal>
 
-        <StreamBand className="mt-16 md:mt-24" />
-
-        <address className="mt-16 grid gap-12 not-italic md:mt-20 lg:grid-cols-12 lg:gap-8">
-          <Reveal className="lg:col-span-7">
-            <p className="hud text-fog">Call</p>
-            <BigLink href={contact.phoneHref} className="display mt-3 text-[clamp(2.25rem,5.5vw,4.25rem)]">
-              {contact.phone}
-            </BigLink>
-            <p className="hud mt-10 text-fog">Email</p>
-            <BigLink
-              href={`mailto:${contact.email}`}
-              className="mt-3 text-[clamp(1.2rem,3vw,2.25rem)] font-bold tracking-tight [overflow-wrap:anywhere]"
-            >
-              {contact.email}
-            </BigLink>
-          </Reveal>
-
-          <Reveal delay={motionTokens.duration.fast} className="lg:col-span-5">
-            <dl className="border-t border-hair">
-              {SCHEDULE.map((row) => (
-                <div key={row.k} className="grid grid-cols-[5.5rem_1fr] gap-4 border-b border-hair py-5">
-                  <dt className="hud pt-1 text-fog">{row.k}</dt>
-                  <dd className="leading-relaxed text-mist">
-                    {row.href ? (
-                      <a
-                        href={row.href}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="rounded-sm underline decoration-mist/30 underline-offset-4 transition-colors hover:text-chalk hover:decoration-chalk"
-                      >
-                        {row.v}
-                        <span className="sr-only"> (opens map in a new tab)</span>
-                      </a>
-                    ) : (
-                      row.v
-                    )}
-                  </dd>
-                </div>
-              ))}
-            </dl>
-          </Reveal>
-        </address>
+        <Reveal delay={motionTokens.duration.fast} className="relative lg:col-span-5">
+          <Panel title="Transmittal" bodyClassName="px-4 pb-1 sm:px-5">
+            <address className="not-italic">
+              <dl>
+                {TRANSMITTAL.map((row) => (
+                  <div key={row.k} className="grid grid-cols-[4.5rem_1fr] gap-4 border-b border-hair/70 py-3.5 last:border-b-0">
+                    <dt className="hud pt-[3px] text-fog">{row.k}</dt>
+                    <dd className="text-[15px] leading-relaxed text-chalk">{row.v}</dd>
+                  </div>
+                ))}
+              </dl>
+            </address>
+          </Panel>
+          {/*
+            Decorative: the view title already says "Issued for bid". pointer-events-none keeps the links under it
+            clickable. Below lg it sits in the column gap above the panel, clear of the "Transmittal" label.
+          */}
+          <Stamp
+            tilt={-8}
+            delay={motionTokens.duration.normal}
+            className="pointer-events-none absolute -top-14 right-1 text-red-glow lg:-right-4 lg:-top-7"
+          >
+            <div aria-hidden className="rounded-[6px] border-[5px] border-double border-current bg-void/85 px-4 py-2.5 text-center">
+              <p className="display text-[1.1rem] leading-none tracking-[0.04em] sm:text-[1.35rem]">ISSUED FOR BID</p>
+              <p className="hud mt-1.5">
+                {VIEW.sheet} · {BUILD_YEAR}
+              </p>
+            </div>
+          </Stamp>
+        </Reveal>
       </div>
-    </section>
+
+      <StreamBand className="mt-20 md:mt-28" />
+    </ViewFrame>
   );
 }
 
@@ -172,6 +186,10 @@ function StreamBand({ className = "" }: { className?: string }) {
           pathLength: { duration: STREAM_DRAW, ease: motionTokens.easing.smooth, delay: i * motionTokens.stagger },
           opacity: { duration: motionTokens.duration.fast, delay: i * motionTokens.stagger },
         };
+  const tagIn = (i: number) =>
+    reduce
+      ? { duration: motionTokens.duration.fast }
+      : { duration: motionTokens.duration.normal, delay: STREAM_DRAW + i * motionTokens.stagger };
 
   return (
     <div ref={ref} aria-hidden className={`relative ${className}`} style={{ aspectRatio: `${BAND_W} / ${BAND_H}` }}>
@@ -217,6 +235,21 @@ function StreamBand({ className = "" }: { className?: string }) {
           ))}
         </motion.g>
       </motion.svg>
+      {/* BIM tags naming each stream's airflow, once it has drawn on. */}
+      {STREAM_TAGS.map((tag, i) => (
+        <motion.span
+          key={tag}
+          className="bim-tag absolute left-[3%] hidden md:inline-flex"
+          style={{ top: `calc(${ENTRY[i] * 100}% - 34px)` }}
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          viewport={{ once: true, margin: "-80px" }}
+          transition={tagIn(i)}
+        >
+          <span className={`h-1.5 w-1.5 rounded-full ${STREAM_FILLS[i]}`} />
+          {tag}
+        </motion.span>
+      ))}
       <div className="absolute" style={MARK_BOX}>
         <BrandMark draw="view" delay={motionTokens.duration.slow} className="block h-auto w-full" />
       </div>
@@ -266,36 +299,11 @@ function MagneticCta({ href, children }: { href: string; children: ReactNode }) 
         href={href}
         style={{ x, y }}
         whileTap={{ scale: motionTokens.scale.press }}
-        className="btn btn-primary px-8 py-5 text-base"
+        className="btn btn-primary px-8 py-5 text-base md:px-10 md:py-6 md:text-lg"
       >
         {children}
       </motion.a>
     </span>
-  );
-}
-
-/** A large contact link whose tri-colour underline draws across on hover or focus. */
-function BigLink({ href, className, children }: { href: string; className: string; children: ReactNode }) {
-  return (
-    <motion.a
-      href={href}
-      className={`relative inline-block rounded-sm text-chalk ${className}`}
-      initial="rest"
-      animate="rest"
-      whileHover="hover"
-      whileFocus="hover"
-    >
-      {children}
-      <motion.span
-        aria-hidden
-        className="absolute inset-x-0 -bottom-1 h-[3px] origin-left"
-        style={{ background: TRI_BAR }}
-        variants={{
-          rest: { scaleX: 0 },
-          hover: { scaleX: 1, transition: { duration: motionTokens.duration.normal, ease: motionTokens.easing.smooth } },
-        }}
-      />
-    </motion.a>
   );
 }
 

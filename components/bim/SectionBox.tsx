@@ -23,7 +23,14 @@ export default function SectionBox() {
   const { edges, lineMat, faceMat } = useMemo(
     () => ({
       edges: new THREE.EdgesGeometry(new THREE.BoxGeometry(1, 1, 1)),
-      lineMat: new THREE.LineBasicMaterial({ color: COLORS.sectionBox, transparent: true, opacity: 0, depthWrite: false }),
+      // cyan selection colour, lifted so the box reads bright while it moves
+      lineMat: new THREE.LineBasicMaterial({
+        color: new THREE.Color(COLORS.sectionBox).multiplyScalar(1.6),
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+        toneMapped: false,
+      }),
       faceMat: new THREE.MeshBasicMaterial({
         color: COLORS.sectionBox,
         transparent: true,

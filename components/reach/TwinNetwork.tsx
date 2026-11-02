@@ -5,12 +5,13 @@ import * as THREE from "three";
 import { useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
 import { motionTokens } from "@/lib/motion-tokens";
 import { clamp, easeInOutCubic, easeOutBack, easeOutCubic, seg } from "@/lib/timing";
-import { CHOREO, CITIES, HQ, HQ_INDEX, LEVEL, SLAB, STREAMS, TOTAL, type Focus, type ReachCity, type TwinClock } from "./data";
+import { CHOREO, CITIES, HQ, HQ_INDEX, LEVEL, SLAB, STREAMS, TOTAL, TWIN_COLORS, type Focus, type ReachCity, type TwinClock } from "./data";
 
 /**
- * The network on the map: a pillar per city with one floor plate per active
- * project, tri-colour rings at HQ, and an arc from HQ to every city with the
- * logo's three streams travelling along it. Transparent overlays carry
+ * The network on the map: a cyan pillar per city with one floor plate per active
+ * project (white core, white top plate), rings at HQ in the three stream colours, and
+ * an arc from HQ to every city — cycling supply blue, exhaust green and return coral —
+ * with its stream travelling along it. Transparent overlays carry
  * renderOrder 1 so they always composite over the (transparent) land.
  */
 
@@ -41,6 +42,8 @@ const PARTICLE_SPEED = 0.85; // world units per second
 const PARTICLE_GAP = 1.5; // world units between particles on an arc
 
 const STREAM_COLORS = STREAMS.map((s) => new THREE.Color(s.glow));
+const PILLAR = new THREE.Color(TWIN_COLORS.pillar);
+const CORE = new THREE.Color(TWIN_COLORS.core);
 const dummy = new THREE.Object3D();
 const tint = new THREE.Color();
 const tintTop = new THREE.Color();
@@ -107,9 +110,12 @@ function Pillars({ clock, focus, onHover, onSelect }: Omit<NetworkProps, "lowEnd
       h.instanceMatrix.needsUpdate = true;
       h.computeBoundingSphere();
     }
-    for (const m of [core.current, halo.current, foot.current]) CITIES.forEach((c, i) => m?.setColorAt(i, STREAM_COLORS[c.stream]));
-    let j = 0;
-    for (const c of CITIES) for (let k = 0; k < c.count; k++) plates.current?.setColorAt(j++, STREAM_COLORS[c.stream]);
+    CITIES.forEach((_, i) => {
+      core.current?.setColorAt(i, CORE);
+      halo.current?.setColorAt(i, PILLAR);
+      foot.current?.setColorAt(i, PILLAR);
+    });
+    for (let j = 0; j < TOTAL; j++) plates.current?.setColorAt(j, PILLAR);
   }, []);
 
   useFrame(() => {
@@ -122,18 +128,19 @@ function Pillars({ clock, focus, onHover, onSelect }: Omit<NetworkProps, "lowEnd
       const grow = easeOutCubic(seg(t, c.pillarAt, c.pillarAt + CHOREO.pillarGrow));
       const height = Math.max(1e-4, c.count * LEVEL * grow);
       const wide = 1 + 0.5 * on;
-      tint.copy(STREAM_COLORS[c.stream]).multiplyScalar((1 + 0.7 * on) * (1 - 0.72 * dim));
-      tintTop.copy(tint).multiplyScalar(1.5);
+      const glow = (1 + 0.7 * on) * (1 - 0.72 * dim);
+      tint.copy(PILLAR).multiplyScalar(glow);
+      tintTop.copy(CORE).multiplyScalar(glow);
 
       place(c0, i, c.x, SLAB, c.z, CORE_R * wide, height, CORE_R * wide);
       place(h0, i, c.x, SLAB, c.z, HALO_R * wide, height, HALO_R * wide);
       const footR = FOOT_R * wide * easeOutBack(seg(t, c.pillarAt, c.pillarAt + CHOREO.pillarGrow));
       place(f0, i, c.x, SLAB + 0.002, c.z, footR, 1, footR);
-      c0.setColorAt(i, tint);
+      c0.setColorAt(i, tintTop);
       h0.setColorAt(i, tint);
       f0.setColorAt(i, tint);
 
-      // A plate pops as the column passes each storey; the top plate burns brighter.
+      // A plate pops as the column passes each storey; the top plate burns white.
       const storeys = height / LEVEL;
       for (let k = 0; k < c.count; k++, j++) {
         const r = PLATE_R * wide * easeOutBack(clamp((storeys - k - 0.7) / 0.3));

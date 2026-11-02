@@ -5,9 +5,13 @@ import * as THREE from "three";
 import { useFrame, useThree } from "@react-three/fiber";
 import { Environment, Lightformer, PerformanceMonitor } from "@react-three/drei";
 import { getMotionPaused } from "@/lib/motion-pause";
+import { lerp } from "@/lib/timing";
+import { getViewer } from "@/lib/viewer-state";
 import Atmosphere from "./Atmosphere";
 import CameraRig from "./CameraRig";
 import ChapterScan from "./ChapterScan";
+import DroneLayer from "./drone/DroneControls";
+import { droneLink } from "./drone/link";
 import Effects from "./Effects";
 import Ground from "./Ground";
 import SectionBox from "./SectionBox";
@@ -30,9 +34,18 @@ import Structure from "./model/Structure";
  * keeps the model glued to the scroll instead of trailing it.
  */
 const FOLLOW = 10;
+/** Drone mode shows the finished model: the story runs on to 1 at this rate (a time-lapse of the build) and back on landing. */
+const DRONE_FOLLOW = 1.6;
+/** How fast the drone's X-ray / section box ease to a new preset's (1/s). */
+const DRONE_XRAY = 5;
+/** A frame gap longer than this (s) means the stage was asleep. */
+const RESUME_S = 0.5;
 
 /** Fog always passes through tone mapping; pre-compensated so far geometry fades into --void exactly. */
 const FOG = preToneMapped(COLORS.void);
+
+/** The X-ray and section box while flying; taken over from the story's values on entry. */
+const flying = { on: false, xray: 0, cut: 0 };
 
 /**
  * Eases the clocks once per frame, before any part reads them (negative
@@ -40,20 +53,39 @@ const FOG = preToneMapped(COLORS.void);
  */
 function Clocks() {
   useFrame((_, delta) => {
+    const drone = getViewer().drone;
+    const dt = Math.min(delta, 0.1);
+    if (drone && !flying.on) {
+      flying.xray = bim.xray;
+      flying.cut = bim.cut;
+    }
+    flying.on = drone;
     if (bim.reduced) {
       bim.intro = bim.story = bim.hero = 1;
     } else {
-      const dt = Math.min(delta, 0.1);
       // ambient loops (flows, pulses, dust) run on bim.time: the Pause motion switch freezes them
       if (!getMotionPaused()) bim.time += dt;
-      // A visitor who scrolls on before the 4D sequence finishes shouldn't wait for it.
-      const hurry = bim.storyTarget > 0.005 || bim.heroTarget > 0.3 ? 5 : 1;
+      // A visitor who scrolls on (or takes the drone) before the 4D sequence finishes shouldn't wait for it.
+      const hurry = drone || bim.storyTarget > 0.005 || bim.heroTarget > 0.3 ? 5 : 1;
       if (bim.stageReady) bim.intro = Math.min(1, bim.intro + (dt / INTRO_SECONDS) * hurry);
-      bim.story = THREE.MathUtils.damp(bim.story, bim.storyTarget, FOLLOW, dt);
+      const follow = lerp(FOLLOW, DRONE_FOLLOW, droneLink.weight);
+      const storyGoal = drone ? 1 : bim.storyTarget;
+      if (delta > RESUME_S) {
+        // first frame after the stage slept (off-screen, hidden tab): land on the scroll position instead of racing the whole track
+        bim.story = storyGoal;
+        bim.hero = bim.heroTarget;
+      }
+      bim.story = THREE.MathUtils.damp(bim.story, storyGoal, follow, dt);
       bim.hero = THREE.MathUtils.damp(bim.hero, bim.heroTarget, FOLLOW, dt);
     }
-    bim.xray = ease(bim.story, STORY.xray);
-    bim.cut = ease(bim.story, STORY.section);
+    if (drone) {
+      flying.xray = bim.reduced ? droneLink.xray : THREE.MathUtils.damp(flying.xray, droneLink.xray, DRONE_XRAY, dt);
+      flying.cut = bim.reduced ? droneLink.cut : THREE.MathUtils.damp(flying.cut, droneLink.cut, DRONE_XRAY, dt);
+    }
+    // the drone's X-ray holds until the camera is halfway back on the track, so it never lands inside solid walls
+    const w = bim.reduced ? (drone ? 1 : 0) : Math.min(1, droneLink.weight * 2);
+    bim.xray = lerp(ease(bim.story, STORY.xray), flying.xray, w);
+    bim.cut = lerp(ease(bim.story, STORY.section), flying.cut, w);
     applyXray(bim.xray);
   }, -10);
   return null;
@@ -135,6 +167,7 @@ export default function Scene({ postFx, onReady, onDecline, onIncline }: Props) 
       <Prewarm onReady={onReady} />
       <Settle />
       <CameraRig />
+      <DroneLayer />
 
       <Ground />
       <Atmosphere />

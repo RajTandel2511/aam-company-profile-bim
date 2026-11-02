@@ -1,65 +1,82 @@
 import { BUILD_YEAR, company, contact, credentials } from "@/lib/content";
 import { BrandMark } from "@/components/shell/BrandMark";
-import { SECTION_LINKS, STREAM_FILLS } from "@/components/shell/site";
+import { STREAM_FILLS, VIEWS } from "@/components/shell/site";
 
 const credential = (label: string) => credentials.find((c) => c.label === label)?.value ?? "";
 const LICENSE_LINE = `CA License ${credential("CA Contractor License")} · DIR ${credential("DIR Registration")}`;
-const link = "rounded-sm text-mist transition-colors hover:text-chalk";
+const LINK = "rounded-sm text-mist transition-colors hover:text-cyan";
+/** Title-block cells: hairline dividers, stacked below md, two columns on tablets, one strip from lg. */
+const CELL = "border-hair p-5 md:p-6";
 
-/** Opaque footer: it scrolls over the fixed 3D stage, so it stacks above it. */
+/**
+ * The drawing's title block, run full width along the bottom of the set: firm,
+ * licensing, office, the sheet index and this sheet's number and issue date.
+ * Opaque and z-10, so it scrolls over the fixed 3D stage; the extra bottom
+ * padding from md clears the fixed status bar.
+ */
 export default function Footer() {
   return (
-    <footer className="relative z-10 border-t border-hair bg-void">
-      <div className="container-x py-16 md:py-24">
-        {/* Two columns on tablets (a 12-column split left the email a 4-column cell it broke inside), 12 from lg. */}
-        <div className="grid gap-12 md:grid-cols-2 md:gap-8 lg:grid-cols-12">
-          <div className="md:col-span-2 lg:col-span-5">
-            <BrandMark className="block h-14 w-auto" />
-            <p className="mt-6 text-lg font-bold text-chalk">{company.name}</p>
+    <footer className="relative z-10 border-t border-chalk/25 bg-void">
+      <div className="container-x pb-8 pt-10 md:pb-[4.5rem] md:pt-14">
+        <div className="grid border-[1.5px] border-chalk/35 md:grid-cols-2 lg:grid-cols-12">
+          <div className={`${CELL} border-b md:col-span-2 lg:col-span-4 lg:border-b-0 lg:border-r`}>
+            <BrandMark className="block h-12 w-auto" />
+            <p className="mt-5 text-lg font-bold leading-snug text-chalk">{company.name}</p>
             <p className="mt-1 text-mist">{company.certification}</p>
             <p className="hud mt-4 text-fog">{LICENSE_LINE}</p>
           </div>
 
-          <nav aria-label="Footer" className="lg:col-span-3">
-            <p className="eyebrow text-fog">Sections</p>
-            <ul className="mt-5 grid grid-cols-2 gap-x-6 gap-y-3 font-semibold lg:grid-cols-1">
-              {SECTION_LINKS.map((l) => (
-                <li key={l.id}>
-                  <a href={`#${l.id}`} className={link}>
-                    {l.label}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </nav>
-
-          <address className="not-italic lg:col-span-4">
-            <p className="eyebrow text-fog">Office</p>
-            <p className="mt-5 text-chalk">
+          <address className={`${CELL} border-b not-italic md:border-r lg:col-span-3 lg:border-b-0`}>
+            <p className="hud text-fog">Office</p>
+            <p className="mt-3 text-chalk">
               {contact.street}
               <br />
               {contact.city}
             </p>
-            <p className="mt-4 flex flex-col items-start gap-1 font-semibold">
-              <a href={contact.phoneHref} className={link}>
+            <p className="mt-3 flex flex-col items-start gap-1 font-semibold">
+              <a href={contact.phoneHref} className={LINK}>
                 {contact.phone}
               </a>
-              <a href={`mailto:${contact.email}`} className={`${link} [overflow-wrap:anywhere]`}>
+              <a href={`mailto:${contact.email}`} className={`${LINK} [overflow-wrap:anywhere]`}>
                 {contact.email}
               </a>
             </p>
           </address>
+
+          <nav aria-label="Sheet index" className={`${CELL} border-b lg:col-span-3 lg:border-b-0 lg:border-r`}>
+            <p className="hud text-fog">Sheet index</p>
+            <ol className="mt-3 grid gap-y-1">
+              {VIEWS.map((v) => (
+                <li key={v.id}>
+                  <a href={`#${v.id}`} className={`${LINK} grid grid-cols-[1.75rem_3.25rem_1fr] items-baseline gap-2 py-0.5`}>
+                    <span className="mono text-[12px] text-fog">{v.index}</span>
+                    <span className="mono text-[12px] text-cyan">{v.sheet}</span>
+                    <span className="font-semibold">{v.label}</span>
+                  </a>
+                </li>
+              ))}
+            </ol>
+          </nav>
+
+          <div className={`${CELL} md:col-span-2 lg:col-span-2`}>
+            <p className="hud text-fog">Sheet</p>
+            <p className="display mt-2 text-[2.6rem] text-chalk">G-000</p>
+            <dl className="hud mt-4 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-fog">
+              <dt>Issued</dt>
+              <dd className="text-mist">{BUILD_YEAR}</dd>
+              <dt>Scale</dt>
+              <dd className="text-mist">NTS</dd>
+            </dl>
+          </div>
         </div>
 
-        <div className="mt-14 flex flex-wrap items-end justify-between gap-6 border-t border-hair pt-6">
+        <div className="mt-6 flex flex-wrap items-end justify-between gap-6">
           <div className="text-sm text-fog">
-            <p>
-              © {BUILD_YEAR} {company.name}
-            </p>
+            <p>{`© ${BUILD_YEAR} ${company.name}`}</p>
             {/* Required until AAM approves this page for publication. */}
-            <p className="mt-1">Concept draft — not an official website of {company.name}</p>
+            <p className="mt-1">{`Concept draft — not an official website of ${company.name}`}</p>
           </div>
-          <a href="#top" className={`group hud inline-flex items-center gap-3 ${link}`}>
+          <a href="#top" className={`group hud inline-flex items-center gap-3 ${LINK}`}>
             <span aria-hidden className="flex flex-col gap-[3px]">
               {STREAM_FILLS.map((fill) => (
                 <span

@@ -19,6 +19,10 @@ export const bim = {
   pointer: { x: 0, y: 0 },
   /** Camera orientation in degrees, written by CameraRig, read by the DOM view cube. */
   view: { azimuth: 0, elevation: 0 },
+  /** Camera position in model metres, written by CameraRig every frame, read by the DOM status bar. */
+  cam: { x: 0, y: 0, z: 0 },
+  /** Look-at point in model metres, written by CameraRig every frame (drone readout: distance = |cam - target|). */
+  target: { x: 0, y: 0, z: 0 },
   /** Scene seconds — advances only while the stage renders. Drive ambient loops (flows, pulses) from this. */
   time: 0,
   /** 0..1 derived each frame: architecture ghosting (X-ray). */

@@ -40,19 +40,29 @@ export const BED = 0.3;
 export const RUN_Y = BED + T / 2;
 export const Q = Math.PI / 2;
 
+/** Detail-sheet palette: galvanized steel stays steel grey; the drawing on it is cyan, amber and violet. */
 export const COLORS = {
-  bg: "#0D1014",
+  /** the page void — three doesn't tone-map a colour background, so the canvas meets its frame without a seam */
+  bg: "#04070D",
   steel: "#C3CAD1",
   zinc: "#A3ACB5",
-  edge: "#DCE3EA",
-  gasket: "#14181D",
-  bed: "#1B2129",
-  glow: "#3FA3E6",
-  /** cut / notch lines on the blank (drafting red, the logo's red-glow) */
-  notch: "#F0584D",
-  gridCell: "#161C23",
-  gridSection: "#2A313A",
+  /** BIM linework */
+  edge: "#38E1FF",
+  gasket: "#0B1220",
+  bed: "#111B2E",
+  /** drafting cyan: fold and break lines, the lit vanes, the cool rim light */
+  glow: "#38E1FF",
+  /** the flash as a seam or joint closes */
+  seam: "#FFB547",
+  /** cut / notch lines on the blank (violet: the set's detail linework) */
+  notch: "#8B7CFF",
+  // dark on purpose: ACES tone mapping lifts these to a faint navy cell and a cyan major line
+  gridCell: "#1A2E4A",
+  gridSection: "#11607A",
 } as const;
+
+/** Edge-line opacity. Live <Edges> and the baked copy share it, or a fitting would visibly change as it bakes. */
+export const EDGE_OPACITY = 0.5;
 
 /* ------------------------------------------------------------ materials -- */
 
@@ -161,7 +171,7 @@ export function Plate({ size, position, rotation, material = MAT.steel }: PlateP
   return (
     <mesh position={position} rotation={rotation} material={material}>
       <boxGeometry args={size} />
-      <Edges color={COLORS.edge} transparent opacity={0.45} />
+      <Edges color={COLORS.edge} transparent opacity={EDGE_OPACITY} />
     </mesh>
   );
 }
@@ -171,7 +181,7 @@ export function Plate({ size, position, rotation, material = MAT.steel }: PlateP
 /** Only the shared kit materials bake; glows, the elbow's ghost cheek and lit vanes keep their own and stay live. */
 const BAKES = new Set<THREE.Material>(Object.values(MAT));
 /** Linework for every baked fitting, matching <Plate>'s edges. LineSegments2 sets its resolution at each draw. */
-const EDGE_MAT = new LineMaterial({ color: COLORS.edge, transparent: true, opacity: 0.45, linewidth: 1 });
+const EDGE_MAT = new LineMaterial({ color: COLORS.edge, transparent: true, opacity: EDGE_OPACITY, linewidth: 1 });
 
 /**
  * Swaps a fitting's live parts for a baked copy whenever `done`: one mesh per material and
@@ -227,13 +237,13 @@ export function Arrive({ during, from, position = [0, 0, 0], children }: { durin
 
 type GlowProps = { geometry: THREE.BufferGeometry; amount: (p: number) => number; position?: V3; rotation?: V3 };
 
-/** The bright seam highlight: additive, unlit, shown only while `amount` > 0. */
+/** The bright seam highlight (amber): additive, unlit, shown only while `amount` > 0. */
 export function Glow({ geometry, amount, position, rotation }: GlowProps) {
   const ref = useRef<THREE.Mesh>(null);
   const mat = useMemo(
     () =>
       new THREE.MeshBasicMaterial({
-        color: new THREE.Color(COLORS.glow).multiplyScalar(1.8),
+        color: new THREE.Color(COLORS.seam).multiplyScalar(1.8),
         transparent: true,
         opacity: 0,
         blending: THREE.AdditiveBlending,
@@ -251,10 +261,16 @@ export function Glow({ geometry, amount, position, rotation }: GlowProps) {
   return <mesh ref={ref} geometry={geometry} material={mat} position={position} rotation={rotation} visible={false} />;
 }
 
-type TagProps = { position: V3; show: (p: number) => number; children: ReactNode };
+type TagProps = {
+  position: V3;
+  show: (p: number) => number;
+  /** keynote number (sequence.ts NOTE): ties the tag to its row in the section's keynote legend */
+  note?: string;
+  children: ReactNode;
+};
 
-/** Revit-style element tag: a point marker, a 45° leader and a mono label. Opacity is set per frame, never via state. */
-export function Tag({ position, show, children }: TagProps) {
+/** Revit-style element tag: a point marker, a 45° leader and a keynoted mono label. Opacity is set per frame, never via state. */
+export function Tag({ position, show, note, children }: TagProps) {
   const el = useRef<HTMLDivElement>(null);
   useFrame(() => {
     const node = el.current;
@@ -267,10 +283,10 @@ export function Tag({ position, show, children }: TagProps) {
   return (
     <Html position={position} zIndexRange={[20, 0]} pointerEvents="none">
       <div ref={el} aria-hidden="true" className="relative" style={{ opacity: o, visibility: o < 0.01 ? "hidden" : "visible" }}>
-        <span className="absolute -left-1 -top-1 h-2 w-2 rotate-45 border border-blue-glow bg-void" />
-        <span className="absolute left-0 top-0 h-px w-7 origin-left -rotate-45 bg-chalk/50" />
-        <span className="bim-tag absolute bottom-[19px] left-[19px]">
-          <span className="h-1.5 w-1.5 bg-blue-glow" />
+        <span className="absolute -left-1 -top-1 h-2 w-2 rotate-45 border border-cyan bg-void" />
+        <span className="absolute left-0 top-0 h-px w-7 origin-left -rotate-45 bg-cyan/60" />
+        <span className="bim-tag absolute bottom-[19px] left-[19px] border-cyan/40">
+          {note ? <span className="border-r border-cyan/40 pr-1.5 text-cyan">{note}</span> : <span className="h-1.5 w-1.5 bg-cyan" />}
           {children}
         </span>
       </div>
@@ -297,7 +313,7 @@ export function CornerPiece() {
   return (
     <>
       <mesh geometry={GEO.corner} material={MAT.zinc}>
-        <Edges color={COLORS.edge} transparent opacity={0.4} />
+        <Edges color={COLORS.edge} transparent opacity={EDGE_OPACITY} />
       </mesh>
       <mesh geometry={GEO.hole} material={MAT.hole} position={[0, F / 2, F / 2]} />
     </>

@@ -86,7 +86,7 @@ const VERT_MAIN = `#include <worldpos_vertex>
 }`;
 const FRAG_DECL = "#include <common>\nuniform float uSmGlintPos;\nuniform float uSmGlintAmt;\nvarying float vSmGlint;";
 const FRAG_MAIN = `#include <emissivemap_fragment>
-totalEmissiveRadiance += vec3( 1.0, 0.96, 0.9 ) * uSmGlintAmt * ( 1.0 - smoothstep( 0.0, 1.6, abs( vSmGlint - uSmGlintPos ) ) );`;
+totalEmissiveRadiance += vec3( 0.8, 0.94, 1.0 ) * uSmGlintAmt * ( 1.0 - smoothstep( 0.0, 1.6, abs( vSmGlint - uSmGlintPos ) ) );`;
 
 function patchGlint(shader: THREE.WebGLProgramParametersWithUniforms) {
   Object.assign(shader.uniforms, glint);

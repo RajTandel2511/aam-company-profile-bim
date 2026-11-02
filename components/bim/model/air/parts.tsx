@@ -39,7 +39,11 @@ export const tagShow = (from: number, to: number) => () =>
 
 /* ------------------------------------------------------------ materials -- */
 
-/** GLOW clones that draw through the duct walls: the air lives inside the ducts. */
+/**
+ * GLOW clones that draw through the duct walls: the air lives inside the ducts.
+ * ponytail: GLOW is identical in every visual style, so the clones never re-sync;
+ * if a style ever repaints GLOW, copy its colour into these in that repaint.
+ */
 function seeThrough(m: THREE.MeshBasicMaterial) {
   const c = m.clone();
   c.transparent = true;
@@ -215,6 +219,6 @@ export function Terminals({ at, face, boot, appear }: TerminalsProps) {
 
 /** Tag swatch: a system dot (supply / return / exhaust) or a hollow equipment square. */
 export function Swatch({ kind }: { kind: "supply" | "ret" | "exhaust" | "equipment" }) {
-  const fill = { supply: "rounded-full bg-blue", ret: "rounded-full bg-red", exhaust: "rounded-full bg-green", equipment: "border border-chalk/70" }[kind];
+  const fill = { supply: "rounded-full bg-supply", ret: "rounded-full bg-return", exhaust: "rounded-full bg-exhaust", equipment: "border border-chalk/70" }[kind];
   return <span aria-hidden="true" className={`inline-block h-1.5 w-1.5 ${fill}`} />;
 }

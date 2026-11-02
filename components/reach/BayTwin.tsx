@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState, type MutableRefObject } from "react";
 import * as THREE from "three";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Bloom, EffectComposer } from "@react-three/postprocessing";
@@ -8,7 +8,8 @@ import { useReducedMotion } from "motion/react";
 import { motionConfig } from "@/lib/motion-config";
 import { getMotionPaused, useMotionPaused } from "@/lib/motion-pause";
 import { clamp, easeOutCubic, seg } from "@/lib/timing";
-import { CHOREO_END, CITIES, LEVEL, SLAB, TWIN_COLORS, type Focus, type TwinClock } from "./data";
+import { CHOREO_END, CITIES, LEVEL, SLAB, TWIN_COLORS, type Focus, type MapFurniture, type TwinClock } from "./data";
+import { Furniture } from "./TwinFurniture";
 import { Land } from "./TwinLand";
 import { Network } from "./TwinNetwork";
 import { Tags } from "./TwinTags";
@@ -28,7 +29,7 @@ function Warm() {
 }
 
 /**
- * The Bay Area digital twin. Client-only: ReachExplorer loads it with next/dynamic
+ * The Bay Area site plan in 3D. Client-only: ReachExplorer loads it with next/dynamic
  * (ssr: false). The canvas is created only once the map comes within a screen and a
  * half of the viewport; it renders only while on screen with the tab visible, and the
  * scroll-in sequence starts once a third of it is in view. Reduced motion: the
@@ -40,6 +41,8 @@ export type TwinProps = {
   active: string | null;
   onHover: (city: string | null) => void;
   onSelect: (city: string | null) => void;
+  /** the HUD's site-plan furniture, placed from the live camera (TwinFurniture) */
+  furniture: MutableRefObject<MapFurniture>;
 };
 
 type SceneProps = TwinProps & { started: boolean; reduce: boolean; lowEnd: boolean };
@@ -125,12 +128,12 @@ function frameView(aspect: number): { target: THREE.Vector3; dist: number } {
   return { target, dist: fit() };
 }
 
+type View = ReturnType<typeof frameView>;
+
 /** Orbit the fitted view: a slow sway (ambient clock), plus the push-in that opens the sequence. */
-function CameraRig({ clock, reduce }: { clock: TwinClock; reduce: boolean }) {
+function CameraRig({ clock, reduce, view }: { clock: TwinClock; reduce: boolean; view: View }) {
   const camera = useThree((s) => s.camera);
   const scene = useThree((s) => s.scene);
-  const aspect = useThree((s) => s.size.width / Math.max(1, s.size.height));
-  const view = useMemo(() => frameView(aspect), [aspect]);
 
   useFrame(() => {
     const sway = (2 * Math.PI * clock.amb) / DRIFT_PERIOD;
@@ -183,21 +186,24 @@ function Ticker({ clock, focus, started, reduce, active }: TickerProps) {
   return null;
 }
 
-function Scene({ active, onHover, onSelect, started, reduce, lowEnd }: SceneProps) {
+function Scene({ active, onHover, onSelect, furniture, started, reduce, lowEnd }: SceneProps) {
   // ponytail: per-frame scene state is mutated in place (like a ref) — never React state.
   const clock = useMemo<TwinClock>(() => ({ t: 0, amb: 0 }), []);
   const focus = useMemo<Focus>(() => CITIES.map(() => ({ on: 0, dim: 0 })), []);
   const invalidate = useThree((s) => s.invalidate);
+  const aspect = useThree((s) => s.size.width / Math.max(1, s.size.height));
+  const view = useMemo(() => frameView(aspect), [aspect]);
   // On-demand frames (reduced motion, paused, before the sequence starts) still need to show a new highlight.
   useEffect(() => invalidate(), [invalidate, active, started, reduce]);
 
   return (
     <>
       <Ticker clock={clock} focus={focus} started={started} reduce={reduce} active={active} />
-      <CameraRig clock={clock} reduce={reduce} />
+      <CameraRig clock={clock} reduce={reduce} view={view} />
       <Land clock={clock} reduce={reduce} />
       <Network clock={clock} focus={focus} reduce={reduce} lowEnd={lowEnd} onHover={onHover} onSelect={onSelect} />
       <Tags clock={clock} focus={focus} active={active} />
+      <Furniture furniture={furniture} target={view.target} />
     </>
   );
 }
@@ -220,7 +226,7 @@ const Fx = memo(function Fx() {
   );
 });
 
-export default function BayTwin({ active, onHover, onSelect }: TwinProps) {
+export default function BayTwin({ active, onHover, onSelect, furniture }: TwinProps) {
   const ref = useRef<HTMLDivElement>(null);
   const reduce = useReducedMotion() ?? false;
   const paused = useMotionPaused();
@@ -284,7 +290,15 @@ export default function BayTwin({ active, onHover, onSelect }: TwinProps) {
           <color attach="background" args={[TWIN_COLORS.void]} />
           <fog attach="fog" args={[TWIN_COLORS.void, 20, 40]} />
           <Warm />
-          <Scene active={active} onHover={onHover} onSelect={onSelect} started={started} reduce={reduce} lowEnd={lowEnd} />
+          <Scene
+            active={active}
+            onHover={onHover}
+            onSelect={onSelect}
+            furniture={furniture}
+            started={started}
+            reduce={reduce}
+            lowEnd={lowEnd}
+          />
           {!lowEnd && <Fx />}
         </Canvas>
       )}

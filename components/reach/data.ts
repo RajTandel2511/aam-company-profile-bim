@@ -16,29 +16,78 @@ export const SLAB = 0.05;
 /** One active project = one floor plate on a city's pillar, this far apart (world units). */
 export const LEVEL = 0.3;
 
-/** Night palette for the canvas. Hexes mirror the tokens in app/globals.css. */
+/** GIS site-plan palette for the canvas (drawn flat: no tone mapping). Hexes mirror the tokens in app/globals.css. */
 export const TWIN_COLORS = {
-  void: "#090B0E",
-  land: "#131820",
-  landSide: "#1E2630",
-  edge: "#C4CCD5",
-  dot: "#ECF0F4",
-  grid: "#2A313A",
-  scan: "#3FA3E6",
+  void: "#04070D",
+  /** deep navy land, a faint blue halftone on it, cyan county lines */
+  land: "#0A1528",
+  landSide: "#12213B",
+  edge: "#38E1FF",
+  dot: "#6FB6FF",
+  /** the quarter-degree graticule: a dim cyan, like the page's drafting grid */
+  grid: "#165A70",
+  scan: "#38E1FF",
+  /** city pillars: cyan columns and plates, white cores and top plates */
+  pillar: "#38E1FF",
+  core: "#E8F1FF",
 } as const;
 
-/** The logo's three streams in logo order: supply blue, exhaust green, return red. Cities cycle through them. */
+/**
+ * The three streams in logo order — supply blue, exhaust green, return coral (the set's MEP
+ * colours). Cities cycle through them for their arcs. `text` is the AA-safe small-text tint.
+ */
 export const STREAMS = [
-  { glow: "#3FA3E6", text: "text-blue-glow", fill: "bg-blue" },
-  { glow: "#2FCB6E", text: "text-green-glow", fill: "bg-green" },
-  { glow: "#F0584D", text: "text-red-glow", fill: "bg-red" },
+  { glow: "#2E8BFF", text: "text-blue-glow", fill: "bg-supply", stroke: "stroke-supply" },
+  { glow: "#2BFF88", text: "text-green-glow", fill: "bg-exhaust", stroke: "stroke-exhaust" },
+  { glow: "#FF4D6D", text: "text-red-glow", fill: "bg-return", stroke: "stroke-return" },
 ] as const;
+
+/** The graticule every quarter degree, and how far its lines run. Equirectangular, so parallels and meridians are straight. */
+export const LATS = [36.75, 37, 37.25, 37.5, 37.75, 38, 38.25, 38.5, 38.75] as const;
+export const LONS = [-123, -122.75, -122.5, -122.25, -122, -121.75, -121.5, -121.25] as const;
+export const LAT_SPAN = [36.6, 38.9] as const;
+export const LON_SPAN = [-123.3, -120.9] as const;
+
+const dms = (deg: number, hemi: string) => {
+  const a = Math.abs(deg);
+  const d = Math.floor(a);
+  return `${d}°${String(Math.round((a - d) * 60)).padStart(2, "0")}′${hemi}`;
+};
+/** Graticule label, e.g. 37.75 -> "37°45′N", -122.25 -> "122°15′W". */
+export const latLabel = (lat: number) => dms(lat, lat >= 0 ? "N" : "S");
+export const lonLabel = (lon: number) => dms(lon, lon >= 0 ? "E" : "W");
+
+/**
+ * Statute miles per world unit, from the projection itself: one degree of latitude spans
+ * this many map units, and a degree of latitude is ~69.05 mi. Drives the graphic scale bar.
+ */
+const MI_PER_DEGREE_LAT = 69.05;
+export const MI_PER_WORLD = MI_PER_DEGREE_LAT / ((project(37, 0)[1] - project(38, 0)[1]) * WORLD_SCALE);
+/** The graphic scale bar's full drawn width (px); it shows the roundest length in miles that fits. */
+export const SCALE_W = 120;
+
+/**
+ * Site-plan furniture drawn in the DOM over the canvas (ReachExplorer's MapHud) and placed
+ * by the scene every frame it renders (TwinFurniture): coordinate ticks where the graticule
+ * meets the neatline, a north arrow turned with the camera, a graphic scale bar sized to it.
+ */
+export type MapFurniture = {
+  north: HTMLElement | null;
+  scale: HTMLElement | null;
+  scaleBar: HTMLElement | null;
+  scaleText: HTMLElement | null;
+  /** one label per LATS / LONS entry */
+  lat: (HTMLElement | null)[];
+  lon: (HTMLElement | null)[];
+};
 
 export type StreamIndex = 0 | 1 | 2;
 export type CityProject = { name: string; sector: Sector };
 
 export type ReachCity = {
   name: string;
+  /** keynote on the site plan: rank by active work, "01" = most */
+  note: string;
   count: number;
   /** world position on the ground plane */
   x: number;
@@ -120,6 +169,7 @@ export const CITIES: readonly ReachCity[] = ranked.map((c, i) => {
   const arcAt = CHOREO.arcsAt + reach * CHOREO.arcWave;
   return {
     name: c.name,
+    note: String(i + 1).padStart(2, "0"),
     count: c.count,
     x,
     z,

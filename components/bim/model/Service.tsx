@@ -53,8 +53,9 @@ const STOPS = SERVICE_STOPS.map((s, k) => {
   };
 });
 
+/** maintenance reads violet: the ring is lifted past 1 so bloom catches the thin arc */
 const ringMat = new THREE.MeshBasicMaterial({
-  color: new THREE.Color(COLORS.signal).multiplyScalar(1.8),
+  color: new THREE.Color(COLORS.violetGlow).multiplyScalar(3),
   toneMapped: false,
   transparent: true,
   opacity: 0,
@@ -64,7 +65,7 @@ const ringMat = new THREE.MeshBasicMaterial({
 /** unit scan plane, dark at the centre and bright at the rim */
 const DISC = glowGradient(new THREE.RingGeometry(0, 1, 72, 6).rotateX(-Math.PI / 2), (x, _y, z) => Math.hypot(x, z) ** 3);
 const discMat = new THREE.MeshBasicMaterial({
-  color: COLORS.signal,
+  color: COLORS.violet,
   vertexColors: true,
   transparent: true,
   opacity: 0,

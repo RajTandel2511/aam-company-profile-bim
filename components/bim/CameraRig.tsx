@@ -1,145 +1,183 @@
 "use client";
 
+import { useRef } from "react";
 import * as THREE from "three";
 import { useFrame } from "@react-three/fiber";
-import { clamp, easeInOutCubic, lerp, seg } from "@/lib/timing";
-import type { V3 } from "./geometry";
+import { getMotionPaused } from "@/lib/motion-pause";
+import { clamp, easeInOutCubic, lerp } from "@/lib/timing";
+import { DRONE_LENS, PORTRAIT_LENS, droneLink } from "./drone/link";
+import { sampleTrack } from "./drone/track";
 import { bim } from "./store";
-import { CHAPTERS, chapterAt, type ChapterId } from "./timeline";
 
-type Shot = { pos: V3; target: V3 };
+/** Hero establishing orbit, spherical around its target (radius m, polar and azimuth rad). */
+const HERO = { target: new THREE.Vector3(0, 8.5, 0), r: 91.6, phi: 1.323, theta: 0.698 } as const;
+/** Reduced motion: the finished model framed once, no camera moves. */
+const STILL = { pos: new THREE.Vector3(50, 32, 60), target: new THREE.Vector3(0, 10, 0) } as const;
+/** Building envelope half-extents; within `fade` m of it the lens widens and the near plane pulls in. */
+const SHELL = { x: 16.6, top: 17.8, z: 10.6, fade: 3.5 } as const;
+const NEAR = { out: 0.5, in: 0.12 } as const;
+/** Vertical fov in degrees: scroll-track base, and the extra inside the building (track / drone). */
+const LENS = { base: 30, inside: 20, droneInside: 15 } as const;
+/** Seconds for the camera to glide from the drone back onto the scroll track. */
+const GLIDE_S = 1.6;
+/** The finale plan turns slowly once overhead: eases toward `max` rad at `rate` 1/s, unwinds at `back`. */
+const SPIN = { max: 0.7, rate: 0.1, back: 1.2 } as const;
+/** Hover drift amplitude per metre of camera distance — a drone never sits perfectly still. */
+const HOVER = 0.0035;
 
-/**
- * One camera shot per chapter (position, look-at target), in model metres.
- * The rig orbits between them in spherical coordinates around the moving
- * target, so moves arc around the building instead of cutting through it.
- */
-const SHOTS: Record<ChapterId | "hero", Shot> = {
-  hero: { pos: [57, 31, 68], target: [0, 8.5, 0] },
-  model: { pos: [46, 27, 55], target: [0, 9, 0] },
-  sheetmetal: { pos: [42, 25, 38], target: [9, 11.5, 2] },
-  hvac: { pos: [8, 18, 53], target: [0, 9, 0] },
-  exhaust: { pos: [42, 34, 23], target: [8, 14.5, -4] },
-  controls: { pos: [18, 13, 45], target: [-4, 7.5, -3] },
-  maintenance: { pos: [-30, 33, 40], target: [-2, 12, -2] },
-  finale: { pos: [50, 32, 60], target: [0, 10, 0] },
-};
-/** Share of each chapter spent travelling from the previous shot; the rest holds. */
-const TRAVEL = 0.45;
-
-type Orbit = { r: number; phi: number; theta: number; t: THREE.Vector3 };
-
-const scratch = new THREE.Vector3();
-const toOrbit = ({ pos, target }: Shot): Orbit => {
-  scratch.set(pos[0] - target[0], pos[1] - target[1], pos[2] - target[2]);
-  const s = new THREE.Spherical().setFromVector3(scratch);
-  return { r: s.radius, phi: s.phi, theta: s.theta, t: new THREE.Vector3(...target) };
-};
-const ORBITS = Object.fromEntries(Object.entries(SHOTS).map(([k, v]) => [k, toOrbit(v)])) as Record<ChapterId | "hero", Orbit>;
-
-const lerpAngle = (a: number, b: number, t: number) => {
-  let d = b - a;
-  while (d > Math.PI) d -= Math.PI * 2;
-  while (d < -Math.PI) d += Math.PI * 2;
-  return a + d * t;
-};
-
-function mix(a: Orbit, b: Orbit, t: number, out: Orbit) {
-  out.r = lerp(a.r, b.r, t);
-  out.phi = lerp(a.phi, b.phi, t);
-  out.theta = lerpAngle(a.theta, b.theta, t);
-  out.t.lerpVectors(a.t, b.t, t);
-  return out;
-}
-
-/**
- * While a shot holds, the camera keeps gliding — a slow orbit and a gentle
- * push-in tied to scroll — so every bit of scrolling moves the picture and
- * nothing feels parked. The finale sweeps wider.
- */
-const DRIFT = { theta: 0.17, push: 0.07, lift: 0.03 } as const;
-const gainOf = (id: ChapterId) => (id === "finale" ? 2.2 : 1);
-
-function drifted(base: Orbit, hold: number, gain: number, out: Orbit) {
-  out.r = base.r * (1 - DRIFT.push * hold * gain);
-  out.phi = base.phi - DRIFT.lift * hold * gain;
-  out.theta = base.theta + (hold - 0.5) * DRIFT.theta * gain;
-  out.t.copy(base.t);
-  return out;
-}
-
-const heroNow: Orbit = { r: 0, phi: 0, theta: 0, t: new THREE.Vector3() };
-const now: Orbit = { r: 0, phi: 0, theta: 0, t: new THREE.Vector3() };
-const fromShot: Orbit = { r: 0, phi: 0, theta: 0, t: new THREE.Vector3() };
-const toShot: Orbit = { r: 0, phi: 0, theta: 0, t: new THREE.Vector3() };
+const WORLD_UP = new THREE.Vector3(0, 1, 0);
+const pos = new THREE.Vector3();
+const tgt = new THREE.Vector3();
+const heroPos = new THREE.Vector3();
+const offset = new THREE.Vector3();
+const exitPos = new THREE.Vector3();
+const exitTgt = new THREE.Vector3();
+const dir = new THREE.Vector3();
+const flat = new THREE.Vector3(0, 0, -1);
+const up = new THREE.Vector3();
+const look = new THREE.Matrix4();
 const sph = new THREE.Spherical();
-const parallax = { x: 0, y: 0 };
+
+/** 1 inside the building envelope, fading to 0 `fade` metres outside it. */
+function insideness(p: THREE.Vector3): number {
+  const dx = Math.max(Math.abs(p.x) - SHELL.x, 0);
+  const dy = Math.max(p.y - SHELL.top, -p.y, 0);
+  const dz = Math.max(Math.abs(p.z) - SHELL.z, 0);
+  return 1 - THREE.MathUtils.smoothstep(Math.hypot(dx, dy, dz), 0, SHELL.fade);
+}
+
+/** Orient the camera at the target. Looking nearly straight down, "up" becomes the last horizontal heading, so the plan never flips. */
+function aim(cam: THREE.PerspectiveCamera, target: THREE.Vector3) {
+  dir.subVectors(target, cam.position);
+  const along = Math.hypot(dir.x, dir.z);
+  if (along > 1e-5) flat.set(dir.x / along, 0, dir.z / along);
+  const steep = dir.y < 0 && along < -dir.y * 0.45; // within ~24° of straight down
+  look.lookAt(cam.position, target, steep ? flat : up.copy(WORLD_UP));
+  cam.quaternion.setFromRotationMatrix(look);
+}
+
+/** Lens, near plane and the copy-panel framing (right-shift on wide screens, up-shift on portrait); `fly` hands it all to the drone. */
+function frame(cam: THREE.PerspectiveCamera, w: number, h: number, inside: number, fly: number) {
+  const aspect = w / Math.max(1, h);
+  const portrait = aspect >= 1 ? 0 : (1 - aspect) * PORTRAIT_LENS;
+  const fov = lerp(LENS.base, DRONE_LENS, fly) + portrait + inside * lerp(LENS.inside, LENS.droneInside, fly);
+  cam.fov = fov;
+  cam.near = lerp(NEAR.out, NEAR.in, inside);
+  const heroK = clamp(bim.hero);
+  const wide = w >= 1024;
+  const sx = (wide ? w * lerp(0.19, 0.16, heroK) : 0) * (1 - fly);
+  const sy = (wide ? 0 : h * lerp(0.28, 0.17, heroK)) * (1 - fly);
+  cam.setViewOffset(w, h, -sx, sy, w, h); // also updates the projection matrix
+}
+
+/** Readouts for the DOM: view cube, status bar, drone HUD. */
+function publish(p: THREE.Vector3, t: THREE.Vector3) {
+  bim.cam.x = p.x;
+  bim.cam.y = p.y;
+  bim.cam.z = p.z;
+  bim.target.x = t.x;
+  bim.target.y = t.y;
+  bim.target.z = t.z;
+  dir.subVectors(p, t);
+  const len = dir.length() || 1;
+  bim.view.azimuth = THREE.MathUtils.radToDeg(Math.atan2(dir.x, dir.z));
+  bim.view.elevation = THREE.MathUtils.radToDeg(Math.asin(clamp(dir.y / len, -1, 1)));
+}
 
 /**
- * Drives the camera from the clocks: an establishing crane-down during the 4D
- * sequence, a slow sway in the hero, then one shot per chapter. On wide screens
- * the image is shifted right (the copy panel sits left); on portrait screens it
- * is shifted up (copy sits below) and the lens widens to keep the building whole.
+ * Drives the camera. The hero is an aerial establishing orbit while the 4D
+ * sequence plays, then a slow sway; scrolling it away hands over to the drone
+ * track (drone/track.ts), which flies the whole systems story. When drone mode
+ * takes the camera (droneLink.controls), this only keeps the lens and readouts,
+ * and when it lets go the camera glides back onto the track.
  */
 export default function CameraRig() {
+  const rig = useRef({ flying: false, glide: GLIDE_S, fly: 0, spin: 0, px: 0, py: 0 }).current;
+
   useFrame(({ camera, size }, delta) => {
     const cam = camera as THREE.PerspectiveCamera;
     const dt = Math.min(delta, 0.1);
-    const intro = easeInOutCubic(bim.intro);
+    const controls = droneLink.controls;
 
-    // Hero: establishing shot settles as the building assembles, then sways.
-    const hero = ORBITS.hero;
-    heroNow.r = hero.r * lerp(1.22, 1, intro);
-    heroNow.phi = hero.phi * lerp(0.82, 1, intro);
-    heroNow.theta = hero.theta + (bim.reduced ? 0 : Math.sin(bim.time * 0.11) * 0.09 - (1 - intro) * 0.35);
-    heroNow.t.copy(hero.t);
-    // Scrolling the hero away carries the camera halfway to the first story shot.
-    mix(heroNow, ORBITS.model, 0.5 * easeInOutCubic(bim.hero), heroNow);
-
-    if (bim.reduced) {
-      mix(ORBITS.finale, ORBITS.finale, 0, now);
-    } else {
-      const i = chapterAt(bim.story);
-      const { id, range } = CHAPTERS[i];
-      const [a, b] = range;
-      const arrive = a + (b - a) * TRAVEL;
-      const t = easeInOutCubic(seg(bim.story, a, arrive));
-      const hold = seg(bim.story, arrive, b);
-      // travel from where the previous shot's drift ended to where this one's begins, then drift on
-      const from = i === 0 ? heroNow : drifted(ORBITS[CHAPTERS[i - 1].id], 1, gainOf(CHAPTERS[i - 1].id), fromShot);
-      drifted(ORBITS[id], hold, gainOf(id), toShot);
-      mix(from, toShot, t, now);
-      // a breath of idle drift on top
-      now.theta += Math.sin(bim.time * 0.07) * 0.025 * bim.hero;
+    if (controls) {
+      controls.getTarget(tgt, false);
+      exitPos.copy(cam.position);
+      exitTgt.copy(tgt);
+      rig.flying = true;
+      rig.fly = bim.reduced ? 1 : THREE.MathUtils.damp(rig.fly, 1, 6, dt);
+      droneLink.weight = 1;
+      frame(cam, size.width, size.height, insideness(cam.position), rig.fly);
+      publish(cam.position, tgt);
+      return;
+    }
+    if (rig.flying) {
+      rig.flying = false;
+      rig.glide = bim.reduced ? GLIDE_S : 0;
     }
 
-    // Pointer parallax, eased.
-    const k = 1 - Math.exp(-3 * dt);
-    parallax.x += (bim.pointer.x - parallax.x) * k;
-    parallax.y += (bim.pointer.y - parallax.y) * k;
+    // 1. where the shot is: hero orbit -> drone track, or the still frame
+    if (bim.reduced) {
+      pos.copy(STILL.pos);
+      tgt.copy(STILL.target);
+    } else {
+      const e = easeInOutCubic(bim.intro);
+      const sway = Math.sin(bim.time * 0.11) * 0.09;
+      sph.set(HERO.r * lerp(1.3, 1, e), lerp(0.98, HERO.phi, e), HERO.theta - 0.75 * (1 - e) + sway);
+      heroPos.setFromSpherical(sph).add(HERO.target);
+      sampleTrack(bim.story, pos, tgt);
+      const w = easeInOutCubic(clamp(bim.hero));
+      if (w < 1) {
+        pos.lerpVectors(heroPos, pos, w);
+        tgt.lerpVectors(HERO.target, tgt, w);
+      }
+    }
 
-    // Lens and distance for the viewport shape.
+    // 2. frame it for the viewport: pull back on narrow screens (never inside the building), finale spin, parallax, hover
+    const inside = insideness(pos);
     const aspect = size.width / Math.max(1, size.height);
-    const fov = aspect >= 1 ? 30 : 30 + (1 - aspect) * 32;
     const reach = aspect >= 1.25 ? 1 : 1 + (1.25 - aspect) * 0.62;
-    if (Math.abs(cam.fov - fov) > 0.01) cam.fov = fov;
+    const portraitHero = aspect < 1 ? lerp(1.14, 1, clamp(bim.hero)) : 1;
+    offset.subVectors(pos, tgt).multiplyScalar(lerp(reach * portraitHero, 1, inside));
 
-    // Frame around the copy: right-shift on desktop, up-shift on portrait.
-    const story = clamp(bim.hero);
-    const wide = size.width >= 1024;
-    // portrait hero: a smaller model riding in the top third, clear of the headline below it
-    const portraitHero = aspect < 1 ? lerp(1.14, 1, story) : 1;
+    const plan = THREE.MathUtils.smoothstep(offset.y / (offset.length() || 1), 0.97, 0.995);
+    if (bim.reduced) rig.spin = 0;
+    else if (!getMotionPaused()) {
+      const held = plan > 0.99;
+      rig.spin = THREE.MathUtils.damp(rig.spin, held ? SPIN.max : 0, held ? SPIN.rate : SPIN.back, dt);
+    }
+    offset.applyAxisAngle(WORLD_UP, rig.spin * plan);
 
-    sph.set(now.r * reach * portraitHero, clamp(now.phi - parallax.y * 0.025, 0.2, 1.52), now.theta - parallax.x * 0.04);
-    cam.position.setFromSpherical(sph).add(now.t);
-    cam.lookAt(now.t);
+    const k = 1 - Math.exp(-3 * dt);
+    rig.px += (bim.pointer.x - rig.px) * k;
+    rig.py += (bim.pointer.y - rig.py) * k;
+    const g = 1 - inside;
+    sph.setFromVector3(offset);
+    sph.theta -= rig.px * 0.04 * g;
+    sph.phi = clamp(sph.phi - rig.py * 0.025 * g, 0.02, Math.PI - 0.02);
+    offset.setFromSpherical(sph);
+    pos.addVectors(tgt, offset);
+    if (!bim.reduced) {
+      const a = HOVER * sph.radius * (1 - 0.85 * inside) * clamp(bim.hero);
+      pos.x += Math.sin(bim.time * 0.53 + 1.3) * a;
+      pos.y += Math.sin(bim.time * 0.81) * a;
+      pos.z += Math.sin(bim.time * 0.37 + 2.1) * a;
+    }
 
-    const sx = wide ? size.width * lerp(0.19, 0.16, story) : 0;
-    const sy = wide ? 0 : size.height * lerp(0.28, 0.17, story);
-    cam.setViewOffset(size.width, size.height, -sx, sy, size.width, size.height);
+    // 3. coming back from the drone: glide from where it left the camera onto the track
+    let fly = 0;
+    if (rig.glide < GLIDE_S) {
+      rig.glide += dt;
+      fly = 1 - easeInOutCubic(clamp(rig.glide / GLIDE_S));
+      pos.lerp(exitPos, fly);
+      tgt.lerp(exitTgt, fly);
+    }
+    rig.fly = fly;
+    droneLink.weight = fly;
 
-    bim.view.azimuth = THREE.MathUtils.radToDeg(sph.theta);
-    bim.view.elevation = 90 - THREE.MathUtils.radToDeg(sph.phi);
+    cam.position.copy(pos);
+    aim(cam, tgt);
+    frame(cam, size.width, size.height, insideness(pos), fly);
+    publish(pos, tgt);
   });
   return null;
 }
