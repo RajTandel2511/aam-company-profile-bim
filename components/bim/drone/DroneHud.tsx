@@ -109,6 +109,12 @@ function Telemetry() {
 const GLYPHS: Record<DronePreset, ReactNode> = {
   aerial: <path d="M3 6l5-3 5 3v5l-5 3-5-3zM3 6l5 3 5-3M8 9v5" />,
   roof: <path d="M2 13.5h12M3 13.5V7.5h10v6M5 7.5V5h3v2.5M10 7.5V4h2v3.5" />,
+  vrf: (
+    <>
+      <path d="M2.5 2.5h11v6h-11zM6.5 8.5v5M9.5 8.5v5" />
+      <circle cx="8" cy="5.5" r="1.7" />
+    </>
+  ),
   plenum: <path d="M1.5 5.5h13v3h-13zM9 8.5v5h3v-5" />,
   plan: <path d="M2.5 2.5h11v11h-11zM2.5 7.5h11M7.5 2.5v11" />,
   section: <path d="M3 4h10v9H3zM8 1.5v2M8 5.5v2M8 9.5v2M8 13.5v1.5" />,

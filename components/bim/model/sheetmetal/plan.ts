@@ -339,7 +339,7 @@ const nearest = (segs: SegRec[], x: number, z: number) =>
   segs.reduce((b, g) => (Math.hypot(g.x - x, g.z - z) < Math.hypot(b.x - x, b.z - z) ? g : b));
 
 /** Short-lived BIM tags: in as their element installs, out ~0.05 of story later, all gone by TAG_END. */
-export const TAG_END = 0.25;
+export const TAG_END = STORY.sheetmetal.tagsOut;
 export const TAGS: { label: string; at: V3; t: number }[] = [
   { label: "METAL WALL PANELS", at: [CLAD_X + 0.05, 3.4, 7.2], t: SM.panels[0] + 0.004 },
   { label: "COPING", at: [IN_X + 0.2, PARAPET.top + 0.1, IN_Z + 0.2], t: SM.coping[0] + 0.004 },

@@ -13,8 +13,10 @@ import { bim } from "./store";
 const LABEL =
   "Illustrative 3D model of a typical four-storey commercial building. It assembles from the column grid up, then " +
   "each trade goes in as you scroll: architectural sheet metal on the walls and roof edge, a rooftop HVAC unit with " +
-  "supply and return ducts on every floor, restroom exhaust with a rooftop fan and an outside-air hood, EMS controls " +
-  "wired to sensors on each floor, and preventative-maintenance checks on the equipment.";
+  "insulated supply and return ducts, fittings, dampers, VAV boxes and round drops to the diffusers on every floor, " +
+  "a VRF system with three rooftop condensing units, refrigerant piping and ceiling cassettes on each floor plus a " +
+  "ductless split, restroom exhaust with rooftop fans and an outside-air hood, EMS controls wired to sensors on each " +
+  "floor, and preventative-maintenance checks on the equipment.";
 
 /** Total rendered pixels we allow at the top tier (DPR is capped by this, not just by the ratio). */
 const PIXEL_BUDGET = 2.6e6;

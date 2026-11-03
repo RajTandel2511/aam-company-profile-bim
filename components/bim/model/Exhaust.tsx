@@ -9,6 +9,7 @@ import {
   EXHAUST,
   FLOORS,
   OA,
+  ROOF_FANS,
   ROOF_Y,
   exhaustBranch,
   exhaustFlow,
@@ -21,8 +22,9 @@ import {
 import { Pulses, Tag, polyLength } from "../kit";
 import { GLOW, MEP } from "../materials";
 import { bim } from "../store";
-import { STORY, arrive, ease, stagger, win } from "../timeline";
+import { STORY, arrive, ease, stagger, win, type Window } from "../timeline";
 import { RectDuct, extendEnd, trimStart, type DuctRun } from "./duct";
+import { W_ROOF_FANS } from "./air/layout";
 import {
   FLOOR_INDEX,
   FLOW,
@@ -49,9 +51,10 @@ import {
 /**
  * Chapter 03 — EXHAUST & OUTSIDE AIR. The restroom exhaust riser climbs the
  * north-east corner, branches run out floor by floor (bottom-up, chasing the
- * riser) to their ceiling grilles, and EF-1 drops onto its roof curb. The
- * outside-air hood extrudes from RTU-1's east face. From the run mark exhaust
- * pulses up the riser and leaves EF-1 as a plume while fresh air streams into
+ * riser) to their ceiling grilles, and EF-1 drops onto its roof curb, then the
+ * two smaller roof fans EF-2 and EF-3. The outside-air hood extrudes from
+ * RTU-1's east face. From the run mark exhaust pulses up the riser and leaves
+ * EF-1 as a plume (EF-2 / EF-3 trail faint ones) while fresh air streams into
  * the hood. Pure function of bim.story; ambient motion runs on bim.time.
  */
 
@@ -172,72 +175,128 @@ function Intake() {
   return <Particles count={n} material={GLOW.exhaust} place={place} gate={intakeGate} />;
 }
 
-/* ---------------------------------------------------------------- EF-1 -- */
+/* ------------------------------------------------------ roof exhaust fans -- */
 
-/** Up-blast fan: drops `drop` m onto its curb and settles; the rotor spins once exhaust runs. */
-const FAN = { drop: 6, bounce: 0.12, spin: 7, base: 0.06, housing: 0.52, band: 1.06, curb: 2 * F.fanR + 0.1 } as const;
+/** Up-blast fan proportions (fractions of the fan's height / radius); the rotor spins once exhaust runs. */
+const FAN = { bounce: 0.12, spin: 7, base: 0.06, housing: 0.52, band: 1.06 } as const;
 
-function fanParts() {
-  const housingH = F.fanH * FAN.housing;
-  const bandR = F.fanR * FAN.band;
-  const bandH = F.fanH - FAN.base - housingH;
-  const plate = () => box(FAN.curb - 0.04, FAN.base, FAN.curb - 0.04, 0, FAN.base / 2, 0);
-  const housing = () => cylinder(F.fanR, housingH, 0, FAN.base + housingH / 2, 0);
-  const windband = () => cylinder(bandR, bandH, 0, F.fanH - bandH / 2, 0);
-  const curb = () => box(FAN.curb, F.fanCurb, FAN.curb, 0, F.fanCurb / 2, 0);
-  const blades = Array.from({ length: 6 }, (_, k) =>
-    box(F.fanR * 0.62, 0.025, 0.16, F.fanR * 0.42, 0, 0)
+type FanSpec = {
+  x: number;
+  z: number;
+  r: number;
+  curb: number;
+  h: number;
+  /** drop onto the curb inside this story window, from `drop` m above */
+  window: Window;
+  drop: number;
+  /** rotor spins (and the plume runs) from here */
+  spinFrom: number;
+  spin: number;
+};
+
+const EF1: FanSpec = { x: F.riserX, z: F.riserZ, r: F.fanR, curb: F.fanCurb, h: F.fanH, window: X.fan, drop: 6, spinFrom: X.run, spin: FAN.spin };
+/** EF-2, EF-3: smaller fans on their own curbs, running once landed (and once exhaust runs). */
+const SMALL_FANS: FanSpec[] = ROOF_FANS.map((f, k) => ({
+  x: f.x,
+  z: f.z,
+  r: f.r,
+  curb: f.curb,
+  h: f.h,
+  window: W_ROOF_FANS[k],
+  drop: 4,
+  spinFrom: Math.max(X.run, W_ROOF_FANS[k][1]),
+  spin: FAN.spin * 1.3,
+}));
+const FANS = [EF1, ...SMALL_FANS];
+
+function fanParts({ r, curb: curbH, h }: FanSpec) {
+  const k = r / F.fanR;
+  const plateW = 2 * r + 0.1;
+  const housingH = h * FAN.housing;
+  const bandR = r * FAN.band;
+  const bandH = h - FAN.base - housingH;
+  const plate = () => box(plateW - 0.04, FAN.base, plateW - 0.04, 0, FAN.base / 2, 0);
+  const housing = () => cylinder(r, housingH, 0, FAN.base + housingH / 2, 0);
+  const windband = () => cylinder(bandR, bandH, 0, h - bandH / 2, 0);
+  const curb = () => box(plateW, curbH, plateW, 0, curbH / 2, 0);
+  const blades = Array.from({ length: 6 }, (_, b) =>
+    box(r * 0.62, 0.025, 0.16 * k, r * 0.42, 0, 0)
       .rotateX(0.35)
-      .rotateY((k * Math.PI) / 3),
+      .rotateY((b * Math.PI) / 3),
   );
   return {
     body: merge([plate(), housing(), windband()]),
     /** the dark discharge opening inside the windband */
-    shade: disc(bandR - 0.07, 0, F.fanH + 0.01, 0),
+    shade: disc(bandR - 0.07 * k, 0, h + 0.01, 0),
     edges: outline([plate(), housing(), windband()]),
-    rotor: merge([...blades, cylinder(0.17, 0.12)]),
+    rotor: merge([...blades, cylinder(0.2 * r, 0.12 * (h / F.fanH))]),
     curb: curb(),
     curbEdges: outline([curb()]),
   };
 }
+/** One stable maker per fan, for useParts. */
+const FAN_PARTS = FANS.map((spec) => () => fanParts(spec));
 
-function ExhaustFan() {
-  const g = useParts(fanParts);
+function ExhaustFan({ spec, make }: { spec: FanSpec; make: () => ReturnType<typeof fanParts> }) {
+  const g = useParts(make);
   const curb = useRef<THREE.Group>(null);
   const fan = useRef<THREE.Group>(null);
   const rotor = useRef<THREE.Mesh>(null);
   const last = useRef(NaN);
+  const base = ROOF_Y + spec.curb;
 
   useFrame(() => {
-    if (rotor.current) rotor.current.rotation.y = !bim.reduced && bim.story >= X.run ? bim.time * FAN.spin : 0;
+    if (rotor.current) rotor.current.rotation.y = !bim.reduced && bim.story >= spec.spinFrom ? bim.time * spec.spin : 0;
     const c = curb.current;
     const f = fan.current;
     if (!c || !f || bim.story === last.current) return;
     last.current = bim.story;
-    const t = win(bim.story, X.fan);
+    const t = win(bim.story, spec.window);
     const k = easeOutCubic(seg(t, 0, 0.2));
     c.visible = k > 0;
     c.scale.y = Math.max(k, 1e-3);
     const p = seg(t, 0.12, 0.8);
     const q = seg(t, 0.8, 1);
     f.visible = t > 0.12;
-    f.position.y = FAN_BASE + FAN.drop * (1 - easeOutCubic(p)) + FAN.bounce * Math.abs(Math.sin(Math.PI * 2 * q)) * (1 - q) ** 2;
+    f.position.y = base + spec.drop * (1 - easeOutCubic(p)) + FAN.bounce * Math.abs(Math.sin(Math.PI * 2 * q)) * (1 - q) ** 2;
   });
 
   return (
     <group>
-      <group ref={curb} position={[F.riserX, ROOF_Y, F.riserZ]} visible={false}>
+      <group ref={curb} position={[spec.x, ROOF_Y, spec.z]} visible={false}>
         <mesh geometry={g.curb} material={MEP.equipmentShade} />
         <lineSegments geometry={g.curbEdges} material={MEP.edge} />
       </group>
-      <group ref={fan} position={[F.riserX, FAN_BASE, F.riserZ]} visible={false}>
+      <group ref={fan} position={[spec.x, base, spec.z]} visible={false}>
         <mesh geometry={g.body} material={MEP.equipment} />
         <mesh geometry={g.shade} material={MEP.equipmentShade} />
         <lineSegments geometry={g.edges} material={MEP.edge} />
-        <mesh ref={rotor} geometry={g.rotor} material={MEP.equipment} position={[0, F.fanH + 0.05, 0]} />
+        <mesh ref={rotor} geometry={g.rotor} material={MEP.equipment} position={[0, spec.h + 0.05, 0]} />
       </group>
     </group>
   );
+}
+
+/** Faint plumes off EF-2 / EF-3: fewer, smaller motes, each fan's only once it runs. */
+const SMALL_PLUME = { count: 14, period: 2.2, rise: 3.2, spread: 0.55, drift: 0.5, size: 0.05 } as const;
+const SMALL_RUN = Math.min(...SMALL_FANS.map((f) => f.spinFrom));
+const smallPlumeGate = () => running(SMALL_RUN);
+
+function SmallPlumes() {
+  const per = bim.quality === "low" ? SMALL_PLUME.count / 2 : SMALL_PLUME.count;
+  const place = useMemo(() => {
+    const seed = Float32Array.from({ length: SMALL_FANS.length * per * 4 }, prng(0xef23));
+    return (i: number, t: number, out: THREE.Vector3) => {
+      const f = SMALL_FANS[(i / per) | 0];
+      const s = i * 4;
+      const u = fract(t / (SMALL_PLUME.period * (0.85 + 0.3 * seed[s])) + seed[s + 1]);
+      const r = f.r * 0.5 * Math.sqrt(seed[s + 2]) + u * SMALL_PLUME.spread;
+      const a = seed[s + 3] * Math.PI * 2 + u * 1.4;
+      out.set(f.x + Math.cos(a) * r + u * u * SMALL_PLUME.drift, ROOF_Y + f.curb + f.h + 0.06 + u * SMALL_PLUME.rise, f.z + Math.sin(a) * r);
+      return SMALL_PLUME.size * Math.min(1, u / 0.08) * (1 - u) ** 1.3 * running(f.spinFrom);
+    };
+  }, [per]);
+  return <Particles count={SMALL_FANS.length * per} material={GLOW.exhaust} place={place} gate={smallPlumeGate} />;
 }
 
 /* ------------------------------------------------------ outside-air hood -- */
@@ -299,12 +358,15 @@ export default function Exhaust() {
     <group>
       <RectDuct runs={RUNS} material={MEP.exhaust} />
       <Terminals at={GRILLES} face={GRILLE_FACE} boot={GRILLE_BOOT} appear={grilleAppear} />
-      <ExhaustFan />
+      {FANS.map((spec, k) => (
+        <ExhaustFan key={k} spec={spec} make={FAN_PARTS[k]} />
+      ))}
       <OaHood />
       {FLOWS.map(({ key, ...flow }) => (
         <Pulses key={key} {...flow} />
       ))}
       <Plume />
+      <SmallPlumes />
       <Intake />
       <Tag position={EF_TAG} show={efTag}>
         <Swatch kind="equipment" />

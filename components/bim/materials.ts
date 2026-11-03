@@ -56,6 +56,12 @@ export const COLORS = {
   /** EMS / controls: amber (lines, pulses, sensor LEDs) */
   signal: "#FFB547",
   sectionBox: "#38E1FF",
+  /** VRF / split refrigerant piping: copper, glowing copper for flow */
+  refrigerant: "#FF8A4C",
+  refrigerantGlow: "#FFA36E",
+  /** closed-cell pipe insulation (black) and FSK foil duct wrap */
+  insulation: "#1C2633",
+  wrap: "#DCE8F2",
 } as const;
 
 /** Section box: geometry with z > constant is clipped. Constant is animated by SectionBox (1e4 = no cut). */
@@ -95,6 +101,21 @@ export const MEP = {
   equipment: mepMat(COLORS.equipment, { roughness: 0.5, metalness: 0.55, emissiveIntensity: 0.04 }),
   equipmentShade: mepMat(COLORS.equipmentShade, { roughness: 0.6, metalness: 0.5, emissiveIntensity: 0.02 }),
   signal: mepMat(COLORS.signal, { roughness: 0.6, metalness: 0.1, emissiveIntensity: 0.35 }),
+  /** VRF / split refrigerant piping (copper); its emissive follows the style like the air systems */
+  refrigerant: mepMat(COLORS.refrigerant, { roughness: 0.35, metalness: 0.7 }),
+  /** closed-cell insulation on refrigerant lines */
+  insulation: mepMat(COLORS.insulation, { roughness: 0.85, metalness: 0, emissiveIntensity: 0.06 }),
+  /** FSK foil duct wrap: a translucent sleeve over insulated duct, so the system colour still reads through */
+  wrap: new THREE.MeshStandardMaterial({
+    color: COLORS.wrap,
+    roughness: 0.42,
+    metalness: 0.55,
+    transparent: true,
+    opacity: 0.5,
+    depthWrite: false,
+    emissive: COLORS.wrap,
+    emissiveIntensity: 0.06,
+  }),
   /** duct / equipment linework */
   edge: new THREE.LineBasicMaterial({ color: COLORS.edge, transparent: true, opacity: 0.55, depthWrite: false }),
 } as const;
@@ -105,6 +126,7 @@ export const GLOW = {
   // the green is already bright: a small boost lands it on the bloom threshold with the others
   exhaust: glowMat(COLORS.exhaustGlow, 1.5),
   signal: glowMat(COLORS.signal, 2.0),
+  refrigerant: glowMat(COLORS.refrigerantGlow, 2.2),
   white: glowMat("#ffffff", 2.6),
   /** the extrusion head / placement spark on a growing part */
   spark: glowMat("#E8FBFF", 4.0, { transparent: true }),
@@ -114,9 +136,9 @@ export const GLOW = {
 
 const ARCH_KEYS = ["concrete", "concreteShade", "roof", "glass", "mullion", "sheetMetal", "sheetMetalShade"] as const;
 type ArchKey = (typeof ARCH_KEYS)[number];
-const SYSTEMS = ["supply", "ret", "exhaust"] as const;
+const SYSTEMS = ["supply", "ret", "exhaust", "refrigerant"] as const;
 /** Each system's emissive at gain 1; a style scales it. The green reads far brighter, so it glows less. */
-const MEP_GLOW = { supply: 0.22, ret: 0.22, exhaust: 0.1 } as const;
+const MEP_GLOW = { supply: 0.22, ret: 0.22, exhaust: 0.1, refrigerant: 0.2 } as const;
 
 type Finish = Pick<THREE.MeshStandardMaterial, "color" | "emissive" | "emissiveIntensity" | "roughness" | "metalness" | "envMapIntensity">;
 /** A painted ARCH surface: its finish plus opacity solid (no X-ray) and ghosted (full X-ray). */

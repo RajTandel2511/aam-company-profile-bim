@@ -6,7 +6,7 @@ import { useFrame } from "@react-three/fiber";
 import type { V3 } from "../geometry";
 import { GLOW, MEP } from "../materials";
 import { box, merge } from "./air/parts";
-import { fraction, grow, planRun, type DuctSize, type Piece, type Plan } from "./air/plan";
+import { FLANGE, fraction, grow, planRun, type DuctSize, type FlangeSpec, type Piece, type Plan } from "./air/plan";
 
 export { extendEnd, trimStart, type DuctSize } from "./air/plan";
 
@@ -14,7 +14,7 @@ export { extendEnd, trimStart, type DuctSize } from "./air/plan";
  * RectDuct — rectangular sheet-metal duct along orthogonal polylines, the way
  * AAM's shop builds it: straight sections joined by TDC flanges every ~1.5 m,
  * square elbows at the corners, BIM edge linework. Rectangular only — the shop
- * makes no round or spiral duct.
+ * makes no round or spiral duct (round drops are drawn separately, as installed work).
  *
  * Every run extrudes from its first point as build() goes 0..1 — segment by
  * segment, the active one growing along its axis — with a glowing frame
@@ -22,7 +22,8 @@ export { extendEnd, trimStart, type DuctSize } from "./air/plan";
  *
  * All runs in one RectDuct share three draw calls (solid, heads, linework), so
  * group runs by material. Geometry is planned once; frames only rewrite the
- * instances of runs whose build value changed.
+ * instances of runs whose build value changed. The same machinery lays the
+ * insulation wrap: a sleeve material, tape bands as the "flanges", no linework.
  */
 
 export type DuctRun = {
@@ -136,7 +137,16 @@ function writeRun(plan: RunPlan, r: number, b: number, solid: THREE.InstancedMes
   writeHead(heads, r, head, headF, Math.min(1, b / HEAD.fadeIn, (1 - b) / HEAD.fadeOut));
 }
 
-export function RectDuct({ runs, material }: { runs: readonly DuctRun[]; material: THREE.Material }) {
+type RectDuctProps = {
+  runs: readonly DuctRun[];
+  material: THREE.Material;
+  /** joint banding along the runs (default: TDC flanges) */
+  flange?: FlangeSpec;
+  /** BIM edge linework (default on) */
+  lines?: boolean;
+};
+
+export function RectDuct({ runs, material, flange = FLANGE, lines: withLines = true }: RectDuctProps) {
   const solid = useRef<THREE.InstancedMesh>(null);
   const heads = useRef<THREE.InstancedMesh>(null);
   const lines = useRef<THREE.LineSegments>(null);
@@ -144,21 +154,21 @@ export function RectDuct({ runs, material }: { runs: readonly DuctRun[]; materia
   const { plans, count, edges, last } = useMemo(() => {
     let offset = 0;
     const plans = runs.map((run): RunPlan => {
-      const plan = { ...planRun(run.path, run.size), offset, build: run.build };
+      const plan = { ...planRun(run.path, run.size, flange), offset, build: run.build };
       offset += plan.pieces.length;
       return plan;
     });
     const edges = new THREE.BufferGeometry();
     edges.setAttribute("position", new THREE.BufferAttribute(new Float32Array(offset * EDGE_FLOATS), 3).setUsage(THREE.DynamicDrawUsage));
     return { plans, count: offset, edges, last: new Float64Array(runs.length).fill(NaN) };
-  }, [runs]);
+  }, [runs, flange]);
   useEffect(() => () => edges.dispose(), [edges]);
 
   useFrame(() => {
     const mesh = solid.current;
     const head = heads.current;
     const line = lines.current;
-    if (!mesh || !head || !line) return;
+    if (!mesh || !head || (withLines && !line)) return;
     const pos = edges.attributes.position as THREE.BufferAttribute;
     let changed = false;
     for (let r = 0; r < plans.length; r++) {
@@ -176,18 +186,20 @@ export function RectDuct({ runs, material }: { runs: readonly DuctRun[]; materia
       if (last[r] > 0 && last[r] < 1) growing = true;
     }
     mesh.visible = shown;
-    line.visible = shown;
     head.visible = growing;
     mesh.instanceMatrix.needsUpdate = true;
     head.instanceMatrix.needsUpdate = true;
-    pos.needsUpdate = true;
+    if (line) {
+      line.visible = shown;
+      pos.needsUpdate = true;
+    }
   });
 
   return (
     <group>
       <instancedMesh ref={solid} args={[UNIT_BOX, material, count]} frustumCulled={false} visible={false} />
       <instancedMesh ref={heads} args={[HEAD_FRAME, GLOW.spark, runs.length]} frustumCulled={false} visible={false} />
-      <lineSegments ref={lines} geometry={edges} material={MEP.edge} frustumCulled={false} visible={false} />
+      {withLines && <lineSegments ref={lines} geometry={edges} material={MEP.edge} frustumCulled={false} visible={false} />}
     </group>
   );
 }

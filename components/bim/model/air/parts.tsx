@@ -3,12 +3,15 @@
 import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { useFrame } from "@react-three/fiber";
-import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import { easeOutBack, lerp, seg } from "@/lib/timing";
-import { FLOORS, type V3 } from "../../geometry";
+import { easeOutBack, seg } from "@/lib/timing";
+import type { V3 } from "../../geometry";
 import { GLOW, MEP } from "../../materials";
 import { bim } from "../../store";
-import { CHAPTERS, type ChapterId, type Window } from "../../timeline";
+import { CHAPTERS, type ChapterId } from "../../timeline";
+import { box } from "./geo";
+
+export { FLOOR_INDEX, sub } from "./layout";
+export { box, cylinder, disc, merge, outline } from "./geo";
 
 /**
  * Private kit for the air-side model parts (Hvac, Exhaust): see-through flow
@@ -18,9 +21,6 @@ import { CHAPTERS, type ChapterId, type Window } from "../../timeline";
 
 /* --------------------------------------------------------------- timing -- */
 
-export const FLOOR_INDEX = Array.from({ length: FLOORS }, (_, i) => i);
-/** Sub-window [a, b] (fractions) of window w. */
-export const sub = (w: Window, a: number, b: number): Window => [lerp(w[0], w[1], a), lerp(w[0], w[1], b)];
 export const chapterEnd = (id: ChapterId) => CHAPTERS.find((c) => c.id === id)?.range[1] ?? 1;
 export const fract = (v: number) => v - Math.floor(v);
 export const smoothstep = (v: number) => v * v * (3 - 2 * v);
@@ -60,33 +60,6 @@ export const FLOW = {
 export const inDuct = () => Math.min(1, bim.xray * 1.25);
 
 /* --------------------------------------------------- static geometry ----- */
-
-export const box = (sx: number, sy: number, sz: number, x = 0, y = 0, z = 0) =>
-  new THREE.BoxGeometry(sx, sy, sz).translate(x, y, z);
-export const cylinder = (r: number, h: number, x = 0, y = 0, z = 0) =>
-  new THREE.CylinderGeometry(r, r, h, 32).translate(x, y, z);
-/** Flat disc facing up. */
-export const disc = (r: number, x = 0, y = 0, z = 0) =>
-  new THREE.CircleGeometry(r, 32).rotateX(-Math.PI / 2).translate(x, y, z);
-
-/** Merges parts into one geometry (one draw call) and disposes the parts. */
-export function merge(parts: THREE.BufferGeometry[]): THREE.BufferGeometry {
-  const out = mergeGeometries(parts);
-  for (const p of parts) p.dispose();
-  if (!out) throw new Error("merge: parts have mismatched attributes");
-  return out;
-}
-
-/** BIM linework: the parts' hard edges merged into one LineSegments geometry. */
-export function outline(parts: THREE.BufferGeometry[], angle = 30): THREE.BufferGeometry {
-  return merge(
-    parts.map((p) => {
-      const e = new THREE.EdgesGeometry(p, angle);
-      p.dispose();
-      return e;
-    }),
-  );
-}
 
 /** Builds a part's static geometries once and disposes them on unmount. `make` must be module-level. */
 export function useParts<T extends Record<string, THREE.BufferGeometry>>(make: () => T): T {

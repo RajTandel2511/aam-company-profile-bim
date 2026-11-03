@@ -28,18 +28,20 @@ export type Piece = {
 
 export type Plan = { pieces: Piece[]; total: number };
 
-/** TDC flange frames: a joint every ~1.5 m section, standing proud of the duct. */
-export const FLANGE = {
-  step: 1.5,
-  depth: 0.07,
-  proud: 0.045,
+export type FlangeSpec = {
+  step: number;
+  depth: number;
+  proud: number;
   /** at a body start (parent duct or elbow) a touch prouder, so meeting flanges never share a face */
-  proudStart: 0.057,
+  proudStart: number;
   /** no flange closer than this to an open end */
-  endClear: 0.3,
+  endClear: number;
   /** bodies shorter than this (necks) carry none */
-  minBody: 1.0,
-} as const;
+  minBody: number;
+};
+
+/** TDC flange frames: a joint every ~1.5 m section, standing proud of the duct. */
+export const FLANGE: FlangeSpec = { step: 1.5, depth: 0.07, proud: 0.045, proudStart: 0.057, endClear: 0.3, minBody: 1.0 };
 
 const EPS = 1e-6;
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
@@ -66,8 +68,8 @@ function segments(path: readonly V3[], size: DuctSize): Seg[] {
   });
 }
 
-/** Bodies and elbows in path order, then the flanges. `total` is the centreline length. */
-export function planRun(path: readonly V3[], size: DuctSize): Plan {
+/** Bodies and elbows in path order, then the flanges (or any banding laid out like them). `total` is the centreline length. */
+export function planRun(path: readonly V3[], size: DuctSize, spec: FlangeSpec = FLANGE): Plan {
   const segs = segments(path, size);
   const last = segs.length - 1;
   // A square elbow spans the incoming section along the outgoing axis and vice versa.
@@ -91,17 +93,17 @@ export function planRun(path: readonly V3[], size: DuctSize): Plan {
     s[g.axis] = len;
     pieces.push({ c, s, axis: g.axis, dir: g.dir, from, to: from + len, head: true });
 
-    if (len >= FLANGE.minBody) {
+    if (len >= spec.minBody) {
       const flange = (d: number, proud: number) => {
         const fc = [...g.a];
         fc[g.axis] = start + g.dir * d;
         const fs = g.sec.map((v) => v + 2 * proud);
-        fs[g.axis] = FLANGE.depth;
+        fs[g.axis] = spec.depth;
         flanges.push({ c: fc, s: fs, axis: g.axis, dir: g.dir, from: from + d, to: from + d, head: false });
       };
-      const clear = k < last ? FLANGE.step / 2 : FLANGE.endClear;
-      for (let d = 0; d <= len - clear; d += FLANGE.step) flange(d, d === 0 ? FLANGE.proudStart : FLANGE.proud);
-      if (k < last) flange(len, FLANGE.proud);
+      const clear = k < last ? spec.step / 2 : spec.endClear;
+      for (let d = 0; d <= len - clear; d += spec.step) flange(d, d === 0 ? spec.proudStart : spec.proud);
+      if (k < last) flange(len, spec.proud);
     }
 
     if (k < last) {

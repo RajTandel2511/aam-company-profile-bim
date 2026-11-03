@@ -6,32 +6,47 @@ import { useFrame } from "@react-three/fiber";
 import { easeInCubic, easeOutCubic, lerp, prng, seg } from "@/lib/timing";
 import {
   DUCT,
-  FLOORS,
   RETURN,
   ROOF_Y,
   RTU,
   RTU_BASE,
   SUPPLY,
-  diffusers,
   returnFlow,
   returnGrilles,
   returnMain,
   returnTrunk,
   returnY,
   supplyFlow,
-  supplyLaterals,
-  supplyMain,
   supplyTrunk,
   supplyY,
   type V3,
 } from "../geometry";
-import { Pulses, Tag, polyLength } from "../kit";
+import { Tag, polyLength } from "../kit";
 import { GLOW, MEP } from "../materials";
 import { bim } from "../store";
-import { STORY, ease, stagger, win } from "../timeline";
+import { STORY, ease, win } from "../timeline";
 import { RectDuct, extendEnd, trimStart, type DuctRun } from "./duct";
+import { Coordination } from "./air/coordination";
+import { MultiPulses, type Stream } from "./air/flows";
+import { Hangers } from "./air/hangers";
 import {
+  COLLARS,
+  DROPS,
   FLOOR_INDEX,
+  MAIN_LEN,
+  RETURN_NECK,
+  WRAP,
+  W_LATERAL,
+  W_RET,
+  W_SUPPLY,
+  W_TRANSITION,
+  lateralPath,
+  mainParts,
+  shoeAt,
+  wrapParts,
+} from "./air/layout";
+import type { FlangeSpec } from "./air/plan";
+import {
   FLOW,
   Particles,
   Swatch,
@@ -47,19 +62,24 @@ import {
   neckPath,
   outline,
   running,
-  sub,
   tagShow,
   useParts,
 } from "./air/parts";
 
 /**
- * Chapter 02 — HVAC. RTU-1 is craned onto its curb, the supply and return
- * trunks drop down the shaft, the mains run out floor by floor (top-down,
- * chasing the trunks), then laterals, ceiling diffusers and return grilles.
- * From the run mark conditioned air pulses out through the supply, back
- * through the return, and throws from every diffuser. Every state is a pure
- * function of bim.story (scrubbing back un-builds it); ambient motion runs on
- * bim.time.
+ * Chapter 02 — HVAC, drawn as a coordination model. RTU-1 is craned onto its
+ * curb, trapeze hangers go up just ahead of the duct, the supply and return
+ * trunks drop down the shaft and the mains run out floor by floor (top-down,
+ * chasing the trunks). Then the connector pieces land with a placement flash —
+ * fire dampers at the shaft, turning vanes in the main's elbow, concentric
+ * transitions after each lateral, canvas connectors on the trunks, 45° shoe
+ * takeoffs and return tee collars — VAV boxes are lifted onto the shoes, the
+ * laterals extrude from them, round spiral drops and flex feed round-neck
+ * diffusers, and the supply side is wrapped in foil-faced insulation (layout:
+ * air/layout.ts). From the run mark conditioned air pulses out through the
+ * supply, back through the return, and throws from every diffuser. Every state
+ * is a pure function of bim.story (scrubbing back un-builds it); ambient motion
+ * runs on bim.time.
  */
 
 const H = STORY.hvac;
@@ -67,62 +87,30 @@ const HVAC_END = chapterEnd("hvac");
 
 /* ------------------------------------------------------------ schedule -- */
 
-/** Floors build top-down, following the trunks as they drop from the roof. */
-const order = (i: number) => FLOORS - 1 - i;
-const W_SUPPLY = FLOOR_INDEX.map((i) => stagger(H.supply, order(i), FLOORS));
-const W_RET = FLOOR_INDEX.map((i) => stagger(H.ret, order(i), FLOORS));
-const W_TERM = FLOOR_INDEX.map((i) => stagger(H.terminals, order(i), FLOORS));
-/** Inside a floor's terminal window: laterals west to east, then diffuser necks and faces; return necks and grilles alongside. */
-const W_LAT = W_TERM.map((w) => SUPPLY.lateralsX.map((_, j) => stagger(sub(w, 0, 0.6), j, SUPPLY.lateralsX.length, 0.6)));
-const W_NECK = W_TERM.map((w) => sub(w, 0.62, 0.86));
-const W_DIFF = W_TERM.map((w) => sub(w, 0.8, 1));
-const W_RNECK = W_TERM.map((w) => sub(w, 0.5, 0.8));
-const W_GRILLE = W_TERM.map((w) => sub(w, 0.72, 1));
-
 const trunkBuild = () => ease(bim.story, H.trunks);
-const supplyMainBuild = FLOOR_INDEX.map((i) => () => ease(bim.story, W_SUPPLY[i]));
+/** 0..1 of MAIN_LEN: one extrusion front runs the whole split main. */
+const mainFront = FLOOR_INDEX.map((i) => () => ease(bim.story, W_SUPPLY[i]));
 const returnMainBuild = FLOOR_INDEX.map((i) => () => ease(bim.story, W_RET[i]));
-const lateralBuild = W_LAT.map((ws) => ws.map((w) => () => ease(bim.story, w)));
+const lateralBuild = W_LATERAL.map((ws) => ws.map((w) => () => ease(bim.story, w)));
 
 /* ---------------------------------------------------------- ductwork -- */
 
-const DIFF_FACE = [SUPPLY.diffuser, SUPPLY.diffuser] as const;
-const DIFF_BOOT = [0.44, 0.08, 0.44] as const;
-const DIFF_NECK = [0.3, 0.3] as const;
 const GRILLE_BOOT = [1.0, 0.1, 0.48] as const;
-const GRILLE_NECK = [0.9, 0.4] as const;
-/** Laterals run on past the last diffuser so its neck lands fully under the duct. */
-const LAT_TAIL = 0.3;
 /** Trunks tuck under the L1 mains so each takeoff reads as a square elbow. */
 const TRUNK_BOOT = 0.05;
 
-const DIFFUSERS = FLOOR_INDEX.flatMap((i) => diffusers(i));
-const DIFF_FLOOR = FLOOR_INDEX.flatMap((i) => diffusers(i).map(() => i));
+const DIFFUSERS = DROPS.map((d) => d.face);
 const GRILLES = FLOOR_INDEX.flatMap((i) => returnGrilles(i));
 const GRILLE_FLOOR = FLOOR_INDEX.flatMap((i) => returnGrilles(i).map(() => i));
-const diffuserAppear = (k: number) => win(bim.story, W_DIFF[DIFF_FLOOR[k]]);
-const grilleAppear = (k: number) => win(bim.story, W_GRILLE[GRILLE_FLOOR[k]]);
+const grilleAppear = (k: number) => win(bim.story, COLLARS[k].grille);
 
 const SUPPLY_RUNS: DuctRun[] = [
   { path: extendEnd(supplyTrunk, DUCT.supplyMain[1] / 2 + TRUNK_BOOT), size: DUCT.supplyTrunk, build: trunkBuild },
-  ...FLOOR_INDEX.map(
-    (i): DuctRun => ({ path: trimStart(supplyMain(i), DUCT.supplyTrunk[1] / 2), size: DUCT.supplyMain, build: supplyMainBuild[i] }),
+  ...FLOOR_INDEX.flatMap((i) =>
+    mainParts(i).map((p): DuctRun => ({ path: p.path, size: p.size, build: () => (mainFront[i]() * MAIN_LEN - p.from) / (p.to - p.from) })),
   ),
   ...FLOOR_INDEX.flatMap((i) =>
-    supplyLaterals(i).map(
-      (p, j): DuctRun => ({
-        path: extendEnd(trimStart(p, DUCT.supplyMain[0] / 2), LAT_TAIL),
-        size: DUCT.supplyLateral,
-        build: lateralBuild[i][j],
-      }),
-    ),
-  ),
-  ...DIFFUSERS.map(
-    ([x, y, z], k): DuctRun => ({
-      path: neckPath(x, z, supplyY(DIFF_FLOOR[k]) - DUCT.supplyLateral[1] / 2, y, DIFF_BOOT[1]),
-      size: DIFF_NECK,
-      build: () => ease(bim.story, W_NECK[DIFF_FLOOR[k]]),
-    }),
+    SUPPLY.lateralsX.map((x, j): DuctRun => ({ path: lateralPath(i, x), size: DUCT.supplyLateral, build: lateralBuild[i][j] })),
   ),
 ];
 
@@ -134,48 +122,47 @@ const RETURN_RUNS: DuctRun[] = [
   ...GRILLES.map(
     ([x, y, z], k): DuctRun => ({
       path: neckPath(x, z, returnY(GRILLE_FLOOR[k]) - DUCT.returnMain[1] / 2, y, GRILLE_BOOT[1]),
-      size: GRILLE_NECK,
-      build: () => ease(bim.story, W_RNECK[GRILLE_FLOOR[k]]),
+      size: RETURN_NECK,
+      build: () => ease(bim.story, COLLARS[k].neck),
     }),
   ),
 ];
+
+/** Foil-faced insulation on the supply mains and laterals: a translucent sleeve, tape bands as the joints, the head as the wrap front. */
+const WRAP_BANDS: FlangeSpec = { step: WRAP.step, depth: WRAP.depth, proud: WRAP.band, proudStart: WRAP.band, endClear: 0.3, minBody: 1 };
+const WRAP_RUNS: DuctRun[] = FLOOR_INDEX.flatMap((i) =>
+  wrapParts(i).map((p): DuctRun => ({ path: p.path, size: p.size, build: () => win(bim.story, p.window) })),
+);
 
 /* -------------------------------------------------------------- flows -- */
 
 /** Metres between pulses on the mains. */
 const PULSE_GAP = 2;
-type Flow = { key: string; path: V3[]; count: number; speed: number; size: number; material: THREE.Material; gate: () => number };
+const mainCount = (path: V3[]) => Math.max(3, Math.round(polyLength(path) / PULSE_GAP));
+/** Supply air runs once the floor's main and both its transitions are in. */
+const supplyLive = (i: number) => Math.min(done(mainFront[i]()), done(win(bim.story, W_TRANSITION[i][1])));
 
-const mainFlow = (key: string, path: V3[], material: THREE.Material, build: () => number): Flow => ({
-  key,
-  path,
-  count: Math.max(3, Math.round(polyLength(path) / PULSE_GAP)),
-  speed: 3.2,
-  size: 0.085,
-  material,
-  gate: () => Math.min(running(H.run), done(build())) * inDuct(),
+const SUPPLY_STREAMS: Stream[] = FLOOR_INDEX.map((i) => {
+  const path = supplyFlow(i);
+  return { path, count: mainCount(path), gate: () => Math.min(running(H.run), supplyLive(i)) * inDuct() };
 });
-
-const FLOWS: Flow[] = [
-  ...FLOOR_INDEX.map((i) => mainFlow(`s${i}`, supplyFlow(i), FLOW.supply, supplyMainBuild[i])),
-  ...FLOOR_INDEX.map((i) => mainFlow(`r${i}`, returnFlow(i), FLOW.ret, returnMainBuild[i])),
-  ...FLOOR_INDEX.flatMap((i) =>
-    SUPPLY.lateralsX.map(
-      (x, j): Flow => ({
-        key: `l${i}-${j}`,
-        path: [
-          [x, supplyY(i), SUPPLY.mainZ + DUCT.supplyMain[0] / 2],
-          [x, supplyY(i), SUPPLY.lateralEndZ],
-        ],
-        count: 3,
-        speed: 2.2,
-        size: 0.065,
-        material: FLOW.supply,
-        gate: () => Math.min(running(H.run), done(lateralBuild[i][j]())) * inDuct(),
-      }),
-    ),
+const RETURN_STREAMS: Stream[] = FLOOR_INDEX.map((i) => {
+  const path = returnFlow(i);
+  return { path, count: mainCount(path), gate: () => Math.min(running(H.run), done(returnMainBuild[i]())) * inDuct() };
+});
+/** Through the shoe, the VAV box and on down the lateral. */
+const LATERAL_STREAMS: Stream[] = FLOOR_INDEX.flatMap((i) =>
+  SUPPLY.lateralsX.map(
+    (x, j): Stream => ({
+      path: [
+        [x, supplyY(i), shoeAt(i, x)[2]],
+        [x, supplyY(i), SUPPLY.lateralEndZ],
+      ],
+      count: 3,
+      gate: () => Math.min(running(H.run), done(lateralBuild[i][j]())) * inDuct(),
+    }),
   ),
-];
+);
 
 /** Conditioned-air throw: four-way off each diffuser, out along the ceiling, dropping as it slows. */
 const THROW = { perDiffuser: 8, period: 2.6, reach: 1.5, drop: 1.25, size: 0.034 } as const;
@@ -187,7 +174,7 @@ function Throw() {
     const seed = Float32Array.from({ length: DIFFUSERS.length * per * 3 }, prng(0x7a11));
     return (i: number, t: number, out: THREE.Vector3) => {
       const d = (i / per) | 0;
-      const g = win(bim.story, W_DIFF[DIFF_FLOOR[d]]);
+      const g = win(bim.story, DROPS[d].diffuser);
       if (g <= 0) return 0;
       const s = i * 3;
       const p = DIFFUSERS[d];
@@ -313,7 +300,7 @@ function Rtu() {
 /** Floor whose mains carry the SUPPLY AIR / RETURN AIR tags (L3). */
 const TAG_FLOOR = 2;
 const RTU_TAG: V3 = [RTU.cx + RTU.w / 2, RTU_BASE + RTU.h, RTU.cz + RTU.d / 2];
-const SUPPLY_TAG: V3 = [1.5, supplyY(TAG_FLOOR) + DUCT.supplyMain[1] / 2, SUPPLY.mainZ];
+const SUPPLY_TAG: V3 = [1.5, supplyY(TAG_FLOOR) + DUCT.supplyMain[1] / 2 + WRAP.proud, SUPPLY.mainZ];
 const RETURN_TAG: V3 = [-1, returnY(TAG_FLOOR) + DUCT.returnMain[1] / 2, RETURN.mainZ];
 const rtuTag = tagShow(lerp(H.rtu[0], H.rtu[1], 0.8), HVAC_END);
 const supplyTag = tagShow(W_SUPPLY[TAG_FLOOR][1], HVAC_END);
@@ -323,13 +310,15 @@ export default function Hvac() {
   return (
     <group>
       <Rtu />
+      <Hangers />
       <RectDuct runs={SUPPLY_RUNS} material={MEP.supply} />
       <RectDuct runs={RETURN_RUNS} material={MEP.ret} />
-      <Terminals at={DIFFUSERS} face={DIFF_FACE} boot={DIFF_BOOT} appear={diffuserAppear} />
+      <Coordination />
       <Terminals at={GRILLES} face={RETURN.grille} boot={GRILLE_BOOT} appear={grilleAppear} />
-      {FLOWS.map(({ key, ...flow }) => (
-        <Pulses key={key} {...flow} />
-      ))}
+      <RectDuct runs={WRAP_RUNS} material={MEP.wrap} flange={WRAP_BANDS} lines={false} />
+      <MultiPulses streams={SUPPLY_STREAMS} speed={3.2} size={0.085} material={FLOW.supply} />
+      <MultiPulses streams={RETURN_STREAMS} speed={3.2} size={0.085} material={FLOW.ret} />
+      <MultiPulses streams={LATERAL_STREAMS} speed={2.2} size={0.065} material={FLOW.supply} />
       <Throw />
       <Tag position={RTU_TAG} show={rtuTag}>
         <Swatch kind="equipment" />

@@ -15,12 +15,13 @@ import { useMotionPaused } from "@/lib/motion-pause";
 import { motionTokens } from "@/lib/motion-tokens";
 import { useSplitReveal } from "@/lib/use-split-reveal";
 
-type Tone = "ice" | "supply" | "exhaust" | "amber" | "violet";
+type Tone = "ice" | "supply" | "copper" | "exhaust" | "amber" | "violet";
 
 /** System colours: the model's linework (fill) and a text-safe twin (AA on the panels, over the canvas). */
 const TONE: Record<Tone, { text: string; fill: string }> = {
   ice: { text: "text-chalk", fill: "bg-[#C9E7F6]" }, // galvanised sheet metal, iced
   supply: { text: "text-blue-glow", fill: "bg-supply" },
+  copper: { text: "text-[#FF8A4C]", fill: "bg-[#FF8A4C]" }, // refrigerant copper, ~8:1 on the panel
   exhaust: { text: "text-green-glow", fill: "bg-exhaust" },
   amber: { text: "text-amber", fill: "bg-amber" },
   violet: { text: "text-[#B9B0FF]", fill: "bg-violet" }, // violet itself is too dark for small text over the canvas
@@ -28,14 +29,16 @@ const TONE: Record<Tone, { text: string; fill: string }> = {
 
 type Trade = { id: ServiceId & ChapterId; tone: Tone; category: string; doneAt: number; done: string; doing: string };
 
-/** The five trades in build order — chapter ids match content.services ids. */
+/** The six trades in build order — chapter ids match content.services ids, and CHAPTERS[1..6]. */
 const TRADES: Trade[] = [
   { id: "sheetmetal", tone: "ice", category: "Architectural · Envelope", doneAt: STORY.sheetmetal.glint[1], doing: "Installing", done: "Installed" },
   { id: "hvac", tone: "supply", category: "Mechanical · Supply / Return", doneAt: STORY.hvac.run, doing: "Installing", done: "Running" },
+  { id: "vrf", tone: "copper", category: "Mechanical · VRF / Splits", doneAt: STORY.vrf.run, doing: "Installing", done: "Running" },
   { id: "exhaust", tone: "exhaust", category: "Mechanical · Exhaust / OA", doneAt: STORY.exhaust.run, doing: "Installing", done: "Running" },
   { id: "controls", tone: "amber", category: "Controls · EMS network", doneAt: STORY.controls.run, doing: "Commissioning", done: "Online" },
   { id: "maintenance", tone: "violet", category: "Service · Preventative", doneAt: STORY.maintenance.stops[2][1], doing: "Inspecting", done: "PM complete" },
 ];
+const COUNT = String(TRADES.length).padStart(2, "0");
 
 const serviceOf = (id: ServiceId) => {
   const s = services.find((x) => x.id === id);
@@ -43,28 +46,33 @@ const serviceOf = (id: ServiceId) => {
   return s;
 };
 
+const chapterIndex = (id: ChapterId) => CHAPTERS.findIndex((c) => c.id === id);
+
 /** Visibility / Graphics: each model category, its linework, and the chapter it switches on in. */
 const LEGEND = [
-  { label: "Arch. sheet metal", swatch: TONE.ice.fill, from: 1 },
-  { label: "Supply air", swatch: "bg-supply", from: 2 },
-  { label: "Return air", swatch: "bg-return", from: 2 },
-  { label: "Exhaust · outside air", swatch: "bg-exhaust", from: 3 },
-  { label: "EMS / controls", swatch: "dashed", from: 4 },
-  { label: "Preventative maintenance", swatch: "ring", from: 5 },
+  { label: "Arch. sheet metal", swatch: TONE.ice.fill, from: chapterIndex("sheetmetal") },
+  { label: "Supply air", swatch: "bg-supply", from: chapterIndex("hvac") },
+  { label: "Return air", swatch: "bg-return", from: chapterIndex("hvac") },
+  { label: "Duct wrap · FSK", swatch: "wrap", from: chapterIndex("hvac") },
+  { label: "VRF / split units", swatch: "unit", from: chapterIndex("vrf") },
+  { label: "Refrigerant piping", swatch: "pipe", from: chapterIndex("vrf") },
+  { label: "Exhaust · outside air", swatch: "bg-exhaust", from: chapterIndex("exhaust") },
+  { label: "EMS / controls", swatch: "dashed", from: chapterIndex("controls") },
+  { label: "Preventative maintenance", swatch: "ring", from: chapterIndex("maintenance") },
 ] as const;
 
 const VIEW = viewFrame("systems");
 const INTRO =
-  "Follow a typical commercial building as each system goes in — the envelope, the air, the exhaust and fresh air, the controls, and the care that keeps them all running.";
+  "Follow a typical commercial building as each system goes in — the envelope, the air, VRF and split systems, the exhaust and fresh air, the controls, and the care that keeps them all running.";
 
 /* ------------------------------------------------------------------ parts -- */
 
-/** The five systems as the palette's "Views" rail: each cell fills in its system's colour as it goes in. */
+/** The six systems as the palette's "Views" rail: each cell fills in its system's colour as it goes in. */
 function Rail({ p, active }: { p: MotionValue<number>; active: number }) {
   return (
     <div>
       <p className="hud text-fog">Views · Systems in this model</p>
-      <ol className="mt-2.5 grid grid-cols-5 gap-1.5" aria-label="Systems in this model">
+      <ol className="mt-2.5 grid grid-cols-6 gap-1.5" aria-label="Systems in this model">
         {TRADES.map((t, i) => (
           <RailStep key={t.id} p={p} index={i} trade={t} on={active === i + 1} />
         ))}
@@ -96,7 +104,7 @@ function Title({ text, play, as: As = "h3" }: { text: string; play: boolean; as?
   const ref = useRef<HTMLHeadingElement>(null);
   useSplitReveal(ref, { play, delay: motionTokens.duration.fast });
   return (
-    <As ref={ref} data-split className="display mt-3 text-[1.6rem] text-chalk md:text-[clamp(1.9rem,2.7vw,2.75rem)]">
+    <As ref={ref} data-split className="display mt-3 text-[1.6rem] text-chalk md:text-[clamp(1.8rem,2.4vw,2.45rem)]">
       {text}
     </As>
   );
@@ -142,7 +150,7 @@ function TradePanel({ trade, index, on, done, full = false }: TradePanelProps) {
     <>
       <p className={`eyebrow flex items-center gap-2.5 ${tone.text}`}>
         <span aria-hidden className={`h-[3px] w-4 shrink-0 rounded-full ${tone.fill}`} />
-        System 0{index + 1} / 05 · {s.short}
+        System 0{index + 1} / {COUNT} · {s.short}
       </p>
       <Title text={s.title} play={on} />
       <dl className={`mt-4 border-y border-hair ${extra}`}>
@@ -166,7 +174,7 @@ function IntroPanel({ on }: { on: boolean }) {
       <p className="eyebrow text-fog">
         <span className="text-cyan">[ {VIEW.number} ]</span> {VIEW.name} · {VIEW.sheet}
       </p>
-      <Title text="One building. Five systems." play={on} />
+      <Title text="One building. Six systems." play={on} />
       <p className="mt-3 text-[15px] leading-relaxed text-mist max-md:line-clamp-3 md:mt-4 md:text-base">{INTRO}</p>
       <p className="hud mt-5 text-fog">Scroll to build ↓ · Illustrative model · not to scale</p>
     </>
@@ -211,22 +219,43 @@ function FinalePanel({ on }: { on: boolean }) {
   );
 }
 
+const FOIL = { background: "repeating-linear-gradient(135deg, #DCE8F2 0 2px, #7D90B0 2px 3.5px)" } as const;
+
 function Swatch({ kind }: { kind: string }) {
   if (kind === "dashed") return <span className="w-5 border-t-2 border-dashed border-amber" />;
   if (kind === "ring") return <span className="ml-[5px] h-2.5 w-2.5 rounded-full border-[1.5px] border-violet" />;
+  // FSK foil sleeve over the duct
+  if (kind === "wrap") return <span className="h-[5px] w-5 rounded-[1px]" style={FOIL} />;
+  // a VRF / split unit
+  if (kind === "unit") return <span className="ml-[3px] h-2.5 w-3.5 rounded-[2px] bg-[#FF8A4C]" />;
+  // copper line in black closed-cell insulation
+  if (kind === "pipe")
+    return (
+      <span className="flex h-[6px] w-5 items-center rounded-full bg-[#1C2633] px-[1.5px] ring-1 ring-[#FF8A4C]/45">
+        <span className="h-[2px] w-full rounded-full bg-[#FF8A4C]" />
+      </span>
+    );
   return <span className={`h-[3px] w-5 rounded-full ${kind}`} />;
 }
 
-/** The legend as the model's Visibility / Graphics palette: a category switches on as its system goes in. */
+/**
+ * The legend as the model's Visibility / Graphics palette: a category switches on as its system goes in.
+ * data-cards-avoid (here, on the HUD and on the properties panel) keeps the mid-screen element cards clear of it.
+ */
 function Legend({ active }: { active: number }) {
   return (
-    <Panel
-      title="Visibility / Graphics"
-      meta="Model"
-      className="pointer-events-auto absolute bottom-[54px] right-[var(--gutter)] hidden w-[280px] lg:block"
-      bodyClassName="px-4 py-3"
-    >
-      <ul className="hud space-y-2">
+    <div data-cards-avoid className="pointer-events-auto absolute bottom-[54px] right-[var(--gutter)] hidden w-[280px] lg:block">
+      <Panel title="Visibility / Graphics" meta="Model" bodyClassName="px-4 py-3">
+        <LegendRows active={active} />
+      </Panel>
+    </div>
+  );
+}
+
+function LegendRows({ active }: { active: number }) {
+  return (
+    <>
+      <ul className="hud space-y-1.5">
         {LEGEND.map((l) => {
           const shown = active >= l.from;
           return (
@@ -242,44 +271,41 @@ function Legend({ active }: { active: number }) {
         })}
       </ul>
       <p className="hud mt-3 border-t border-hair pt-2 text-fog">Values illustrative · NTS</p>
-    </Panel>
+    </>
   );
 }
 
 /** Which view this is, and how it is cut: section box and X-ray switch on as the story goes inside. */
 function ChapterHud({ active }: { active: number }) {
   const trade = TRADES[active - 1];
-  const inside = active >= 2;
+  const inside = active >= chapterIndex("hvac");
   const system = trade ? `0${active} · ${serviceOf(trade.id).short}` : active === 0 ? "Overview" : "All systems";
   const state = (on: boolean, text: string) => <span className={on ? "text-cyan" : "text-fog"}>{on ? text : "Off"}</span>;
   return (
-    <Panel
-      title={VIEW.name}
-      meta={`3D view · ${VIEW.sheet}`}
-      className="pointer-events-auto absolute right-[var(--gutter)] top-[calc(var(--nav-h)+20px)] hidden w-[340px] lg:block"
-      bodyClassName="flex items-center gap-5 px-4 py-2.5"
-    >
-      <div className="min-w-0 flex-1">
-        <PropRow k="System" v={system} />
-        <PropRow k="Section box" v={state(inside, "On · cut A–A")} />
-        <PropRow k="X-ray" v={state(inside, "On")} />
-      </div>
-      <ViewCube size={40} />
-    </Panel>
+    <div data-cards-avoid className="pointer-events-auto absolute right-[var(--gutter)] top-[calc(var(--nav-h)+20px)] hidden w-[340px] lg:block">
+      <Panel title={VIEW.name} meta={`3D view · ${VIEW.sheet}`} bodyClassName="flex items-center gap-5 px-4 py-2.5">
+        <div className="min-w-0 flex-1">
+          <PropRow k="System" v={system} />
+          <PropRow k="Section box" v={state(inside, "On · cut A–A")} />
+          <PropRow k="X-ray" v={state(inside, "On")} />
+        </div>
+        <ViewCube size={40} />
+      </Panel>
+    </div>
   );
 }
 
 /* ------------------------------------------------------------------ story -- */
 
-/** Reduced motion: no pinned scroll — the saved view as a plain sheet listing the five systems. */
+/** Reduced motion: no pinned scroll — the saved view as a plain sheet listing the six systems. */
 function StaticStory() {
   return (
     <div className="container-x relative py-24 md:py-32">
       <CropMarks className="mx-[calc(var(--gutter)/2)] my-10 md:my-14" />
       <ViewTitle titleId={VIEW.titleId} number={VIEW.number} sheet={VIEW.sheet} name={VIEW.name} kind={VIEW.kind} />
       <p className="mt-6 max-w-2xl text-[17px] leading-relaxed text-mist md:text-lg">
-        A typical commercial building with every system in: the envelope, the air, the exhaust and fresh air, the controls, and
-        the care that keeps them all running.
+        A typical commercial building with every system in: the envelope, the air, VRF and split systems, the exhaust and fresh
+        air, the controls, and the care that keeps them all running.
       </p>
       <div className="mt-12 grid gap-x-10 gap-y-12 md:mt-16 md:grid-cols-2 xl:grid-cols-3">
         {TRADES.map((t, i) => (
@@ -351,7 +377,8 @@ export default function Story() {
       ref={section}
       id={VIEW.id}
       aria-labelledby={VIEW.titleId}
-      className={still ? "blueprint relative isolate bg-void" : "relative h-[640vh] md:h-[760vh]"}
+      // ~91 / 109 vh of scroll per chapter (8 chapters)
+      className={still ? "blueprint relative isolate bg-void" : "relative h-[730vh] md:h-[870vh]"}
     >
       {still ? (
         <StaticStory />
@@ -365,12 +392,14 @@ export default function Story() {
             <Legend active={active} />
 
             {/* phones: a compact sheet at the bottom; desktop: centred between the ribbon and the status bar,
-                capped to the screen and scrollable when it can't fit */}
+                capped to the screen and scrollable when it can't fit — and narrow enough to leave the
+                central band to the element cards (data-cards-avoid) */}
             <div
               ref={panel}
-              className="pointer-events-auto absolute inset-x-3 bottom-3 max-h-[46svh] overflow-y-auto overscroll-contain rounded-md [scrollbar-width:thin] md:inset-x-[var(--gutter)] md:bottom-[42px] md:max-h-[52svh] lg:bottom-auto lg:left-[var(--gutter)] lg:right-auto lg:top-[calc(50%+var(--nav-h)/2-15px)] lg:max-h-[calc(100svh-var(--nav-h)-30px-3rem)] lg:w-[min(460px,36vw)] lg:-translate-y-1/2"
+              data-cards-avoid
+              className="pointer-events-auto absolute inset-x-3 bottom-3 max-h-[46svh] overflow-y-auto overscroll-contain rounded-md [scrollbar-width:thin] md:inset-x-[var(--gutter)] md:bottom-[42px] md:max-h-[52svh] lg:bottom-auto lg:left-[var(--gutter)] lg:right-auto lg:top-[calc(50%+var(--nav-h)/2-15px)] lg:max-h-[calc(100svh-var(--nav-h)-30px-3rem)] lg:w-[min(420px,32vw)] lg:-translate-y-1/2"
             >
-              <Panel title="Properties" meta={`${VIEW.sheet} · 3D view`} bodyClassName="p-5 md:p-6 lg:p-7">
+              <Panel title="Properties" meta={`${VIEW.sheet} · 3D view`} bodyClassName="p-5 md:p-6">
                 <Rail p={scrollYProgress} active={active} />
                 {/* every chapter stays in the DOM (screen readers get all of them); only the active one shows,
                     and only the active one takes up space, so the panel fits the chapter on screen */}

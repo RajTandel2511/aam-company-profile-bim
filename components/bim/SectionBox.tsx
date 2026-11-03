@@ -8,6 +8,7 @@ import { SECTION_Z } from "./geometry";
 import { Tag } from "./kit";
 import { COLORS, sectionPlane } from "./materials";
 import { bim } from "./store";
+import { STORY } from "./timeline";
 
 /** Box extents around the whole model; its south face is the section plane. */
 const BOX = { x: 17.8, y0: -0.3, y1: 21.6, back: -11.8, open: 15 } as const;
@@ -77,7 +78,7 @@ export default function SectionBox() {
       </mesh>
       <Tag
         position={[BOX.x, BOX.y1, SECTION_Z]}
-        show={() => (bim.cut > 0.02 && bim.cut < 1 ? 1 : bim.cut >= 1 ? Math.max(0, 1 - (bim.story - 0.3) * 20) : 0)}
+        show={() => (bim.cut > 0.02 && bim.cut < 1 ? 1 : bim.cut >= 1 ? Math.max(0, 1 - (bim.story - STORY.section[1]) * 20) : 0)}
       >
         SECTION BOX · CUT A–A
       </Tag>

@@ -24,16 +24,17 @@ export const INTRO = {
   annotations: [0.78, 1.0],
 } as const satisfies Record<string, Window>;
 
-export type ChapterId = "model" | "sheetmetal" | "hvac" | "exhaust" | "controls" | "maintenance" | "finale";
+export type ChapterId = "model" | "sheetmetal" | "hvac" | "vrf" | "exhaust" | "controls" | "maintenance" | "finale";
 
-/** Story chapters in scroll order. The five trades map 1:1 to content.services ids. */
+/** Story chapters in scroll order. The six systems map 1:1 to content.services ids. */
 export const CHAPTERS: readonly { id: ChapterId; range: Window }[] = [
-  { id: "model", range: [0.0, 0.1] },
-  { id: "sheetmetal", range: [0.1, 0.25] },
-  { id: "hvac", range: [0.25, 0.43] },
-  { id: "exhaust", range: [0.43, 0.58] },
-  { id: "controls", range: [0.58, 0.73] },
-  { id: "maintenance", range: [0.73, 0.88] },
+  { id: "model", range: [0.0, 0.08] },
+  { id: "sheetmetal", range: [0.08, 0.2] },
+  { id: "hvac", range: [0.2, 0.37] },
+  { id: "vrf", range: [0.37, 0.5] },
+  { id: "exhaust", range: [0.5, 0.62] },
+  { id: "controls", range: [0.62, 0.74] },
+  { id: "maintenance", range: [0.74, 0.88] },
   { id: "finale", range: [0.88, 1.0] },
 ];
 
@@ -44,45 +45,71 @@ export const CHAPTERS: readonly { id: ChapterId; range: Window }[] = [
  */
 export const STORY = {
   sheetmetal: {
-    panels: [0.11, 0.2],
-    coping: [0.12, 0.165],
-    flashing: [0.14, 0.18],
-    gutters: [0.16, 0.21],
-    canopy: [0.18, 0.225],
-    glint: [0.205, 0.245],
+    panels: [0.09, 0.17],
+    coping: [0.1, 0.14],
+    flashing: [0.12, 0.155],
+    gutters: [0.135, 0.18],
+    canopy: [0.15, 0.19],
+    glint: [0.17, 0.198],
+    /** chapter's own tags are gone by here */
+    tagsOut: 0.2,
   },
   /** Section box engages and the architecture ghosts as the story goes inside. */
-  section: [0.25, 0.3],
-  xray: [0.25, 0.3],
+  section: [0.2, 0.245],
+  xray: [0.2, 0.245],
   hvac: {
-    rtu: [0.27, 0.315],
-    trunks: [0.3, 0.34],
-    supply: [0.325, 0.385],
-    ret: [0.345, 0.405],
-    terminals: [0.36, 0.42],
-    run: 0.4,
+    rtu: [0.215, 0.255],
+    trunks: [0.245, 0.28],
+    hangers: [0.255, 0.335],
+    supply: [0.27, 0.32],
+    ret: [0.29, 0.34],
+    /** duct connectors: tees / takeoffs, transitions, elbows with vanes, flex collars, fire + volume dampers */
+    fittings: [0.295, 0.345],
+    terminals: [0.305, 0.35],
+    /** VAV terminal boxes at the head of each supply lateral */
+    vav: [0.31, 0.35],
+    /** round spiral drops + flex to the diffusers */
+    round: [0.315, 0.355],
+    /** insulation wrap travelling along the supply mains and laterals */
+    wrap: [0.33, 0.365],
+    run: 0.335,
+  },
+  vrf: {
+    /** three VRF condensing units + the split condenser craned onto the roof */
+    units: [0.38, 0.415],
+    /** insulated refrigerant pairs: roof run, riser, floor branches */
+    piping: [0.405, 0.45],
+    /** branch selector boxes, one per floor */
+    boxes: [0.425, 0.455],
+    /** ceiling cassettes on every floor */
+    indoor: [0.44, 0.485],
+    /** ductless wall split in the tech room + its line set */
+    split: [0.455, 0.485],
+    run: 0.47,
   },
   exhaust: {
-    riser: [0.44, 0.475],
-    branches: [0.46, 0.505],
-    grilles: [0.48, 0.52],
-    fan: [0.48, 0.52],
-    oa: [0.51, 0.55],
-    run: 0.53,
+    riser: [0.51, 0.54],
+    branches: [0.525, 0.56],
+    grilles: [0.54, 0.57],
+    fan: [0.54, 0.57],
+    /** the two smaller roof exhaust fans */
+    fans: [0.55, 0.58],
+    oa: [0.56, 0.595],
+    run: 0.575,
   },
   controls: {
-    panel: [0.59, 0.615],
-    riser: [0.605, 0.64],
-    lines: [0.625, 0.69],
-    sensors: [0.655, 0.705],
-    run: 0.68,
+    panel: [0.63, 0.65],
+    riser: [0.645, 0.67],
+    lines: [0.66, 0.705],
+    sensors: [0.685, 0.72],
+    run: 0.7,
   },
   maintenance: {
     /** one window per SERVICE_STOPS entry, in order */
     stops: [
-      [0.75, 0.79],
-      [0.79, 0.83],
-      [0.83, 0.87],
+      [0.755, 0.79],
+      [0.79, 0.825],
+      [0.825, 0.86],
     ],
   },
   finale: {

@@ -27,6 +27,8 @@ import Hvac from "./model/Hvac";
 import Service from "./model/Service";
 import SheetMetal from "./model/SheetMetal";
 import Structure from "./model/Structure";
+import Vrf from "./model/Vrf";
+import ElementCards from "./cards/ElementCards";
 
 /**
  * How fast the eased clocks chase their scroll targets (1/s). Lenis already
@@ -176,7 +178,9 @@ export default function Scene({ postFx, onReady, onDecline, onIncline }: Props) 
       <Annotations />
       <SheetMetal />
       <Hvac />
+      <Vrf />
       <Exhaust />
+      <ElementCards />
       <Controls />
       <Service />
       <Finale />

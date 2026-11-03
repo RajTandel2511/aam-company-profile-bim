@@ -31,7 +31,7 @@ function from(target: V3, azimuth: number, elevation: number, dist: number): V3 
   return [target[0] + dist * Math.cos(e) * Math.sin(a), target[1] + dist * Math.sin(e), target[2] + dist * Math.cos(e) * Math.cos(a)];
 }
 
-/** The five preset shots. X-ray and the section box come on where the inside has to read. */
+/** The preset shots. X-ray and the section box come on where the inside has to read. */
 function shot(id: DronePreset, aspect: number): Shot {
   switch (id) {
     case "aerial": {
@@ -42,9 +42,14 @@ function shot(id: DronePreset, aspect: number): Shot {
       const t: V3 = [-0.5, 17.6, -3];
       return { target: t, pos: from(t, 25, 34, Math.min(70, fit(17.5, 6.5, aspect))), xray: 0, cut: 0 };
     }
+    case "vrf": {
+      // three-quarter aerial of the VRF yard; X-ray shows the refrigerant riser dropping through the floors below it
+      const t: V3 = [2.8, 14.8, 2.4];
+      return { target: t, pos: from(t, 32, 34, Math.min(46, fit(7.5, 6.5, aspect))), xray: 1, cut: 0 };
+    }
     case "plenum":
-      // inside L3's ceiling plenum, just under the slab, looking east down the supply main
-      return { pos: [-6.5, 12.05, 3.1], target: [8, 11.35, 1.6], xray: 1, cut: 1 };
+      // L3 just under the ceiling line, looking east down the supply main — below the VAV boxes, hangers and VRF branches
+      return { pos: [-7.6, 10.8, 3.6], target: [8, 11.45, 1.8], xray: 1, cut: 1 };
     case "plan": {
       // straight down, north up
       const t: V3 = [0, 4, 0.8];

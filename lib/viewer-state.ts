@@ -16,10 +16,11 @@ export const VISUAL_STYLES: readonly { id: VisualStyle; label: string }[] = [
   { id: "wire", label: "Wire" },
 ];
 
-export type DronePreset = "aerial" | "roof" | "plenum" | "plan" | "section";
+export type DronePreset = "aerial" | "roof" | "vrf" | "plenum" | "plan" | "section";
 export const DRONE_PRESETS: readonly { id: DronePreset; label: string }[] = [
   { id: "aerial", label: "Aerial" },
   { id: "roof", label: "Roof" },
+  { id: "vrf", label: "VRF" },
   { id: "plenum", label: "Plenum" },
   { id: "plan", label: "Plan" },
   { id: "section", label: "Section" },

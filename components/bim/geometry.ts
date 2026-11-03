@@ -251,6 +251,87 @@ export const fanRoute: V3[] = [
 ];
 export const sensorAt = (i: number): V3 => [C.sensor.x, LEVELS[i].y + C.sensor.h, C.sensor.z];
 
+/* --------------------------------------------------------- VRF & SPLITS -- */
+
+/**
+ * VRF heat-recovery system: three condensing modules on rails in the roof's
+ * south-east yard, insulated refrigerant pairs run west on sleepers to a riser
+ * beside column C2, a branch selector box on every floor, and ceiling
+ * cassettes in the perimeter zones. Branches run just above the ceiling line,
+ * below every duct (supply bottoms out at ceilingTop - 0.8). Clear of the
+ * shaft, the controls drop at C2 (x 0, z 0.32), the OA intake strip and EF-1.
+ */
+export const VRF = {
+  /** module centres along x; w along x, d along z, rails under them */
+  modulesX: [2.0, 3.55, 5.1],
+  z: 5.2,
+  w: 1.3,
+  d: 0.85,
+  h: 1.75,
+  rail: 0.35,
+  riserX: 1.0,
+  riserZ: -1.0,
+  roofY: ROOF_Y + 0.3,
+  /** branch selector box hung beside the riser on each floor */
+  box: { x: 1.9, z: -1.0, w: 0.55, h: 0.28, d: 0.45 },
+  /** branch elevation below the slab soffit */
+  branchDrop: 0.92,
+  /** cassette face centres (x, z) on every floor: three south, two north */
+  cassettes: [
+    [-7, 6.0],
+    [1, 6.0],
+    [9, 6.0],
+    [-4, -8.0],
+    [4, -8.0],
+  ] as readonly (readonly [number, number])[],
+  cassette: { face: 0.84, h: 0.28 },
+} as const;
+export const vrfY = (i: number) => ceilingTop(i) - VRF.branchDrop;
+export const vrfBoxAt = (i: number): V3 => [VRF.box.x, ceilingTop(i) - 0.62, VRF.box.z];
+export const cassetteAt = (i: number, k: number): V3 => [VRF.cassettes[k][0], ceilingLine(i), VRF.cassettes[k][1]];
+
+/** Roof run from the west end of the yard to the riser head. */
+export const vrfRoofRun: V3[] = [
+  [VRF.modulesX[0] - VRF.w / 2 - 0.15, VRF.roofY, VRF.z],
+  [VRF.riserX, VRF.roofY, VRF.z],
+  [VRF.riserX, VRF.roofY, VRF.riserZ],
+];
+export const vrfRiser: V3[] = [
+  [VRF.riserX, VRF.roofY, VRF.riserZ],
+  [VRF.riserX, vrfY(0), VRF.riserZ],
+];
+/** Floor i: riser -> box, then box -> each cassette (south three along z 6, north two along z -8). */
+export const vrfBranches = (i: number): V3[][] => {
+  const y = vrfY(i);
+  const out: V3[][] = [[[VRF.riserX, y, VRF.riserZ], [VRF.box.x, y, VRF.box.z]]];
+  for (const [x, z] of VRF.cassettes) {
+    out.push([
+      [VRF.box.x, y, VRF.box.z],
+      [VRF.box.x, y, z],
+      [x, y, z],
+      [x, ceilingLine(i) + VRF.cassette.h, z],
+    ]);
+  }
+  return out;
+};
+
+/** Ductless split for the tech room: wall unit on the core's east face at L3, condenser on the roof above the core. */
+export const SPLIT = {
+  wall: { x: -12.08, y: LEVELS[2].y + 2.45, z: 0.6, w: 0.9, h: 0.3, d: 0.22 },
+  condenser: { x: -14.0, z: 0.6, w: 0.85, d: 0.32, h: 0.7, stand: 0.3 },
+} as const;
+export const splitLineSet: V3[] = [
+  [-12.02, SPLIT.wall.y + SPLIT.wall.h / 2, SPLIT.wall.z + 0.3],
+  [-12.02, ROOF_Y + 0.25, SPLIT.wall.z + 0.3],
+  [SPLIT.condenser.x + SPLIT.condenser.w / 2 + 0.05, ROOF_Y + 0.25, SPLIT.wall.z + 0.3],
+];
+
+/** Two smaller up-blast roof exhaust fans (EF-2, EF-3) on curbs, clear of the VRF yard and the controls run. */
+export const ROOF_FANS = [
+  { tag: "EF-2", x: 7.0, z: -5.0, r: 0.55, curb: 0.3, h: 0.7 },
+  { tag: "EF-3", x: 10.5, z: -5.0, r: 0.55, curb: 0.3, h: 0.7 },
+] as const;
+
 /* ----------------------------------------------------------- MAINTENANCE -- */
 
 /** Preventative-maintenance stops, in visiting order. Tags are illustrative marks. */

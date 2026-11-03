@@ -48,7 +48,7 @@ export const stats = [
   { value: 50, suffix: "+", label: "People on the team", note: "Company record" }, // [site] 52 employees
 ] as const;
 
-export type ServiceId = "hvac" | "sheetmetal" | "exhaust" | "controls" | "maintenance" | "fabrication";
+export type ServiceId = "hvac" | "vrf" | "sheetmetal" | "exhaust" | "controls" | "maintenance" | "fabrication";
 
 export const services: {
   id: ServiceId;
@@ -65,6 +65,14 @@ export const services: {
     body: "Complete mechanical systems for commercial, industrial and multifamily buildings — from rooftop unit change-outs on occupied stores to full tenant-improvement and ground-up installs.",
     items: ["Heating", "Ventilation", "Cooling", "Rooftop & split systems", "Ductwork"],
     source: "site",
+  },
+  {
+    id: "vrf",
+    title: "VRF & Split Systems",
+    short: "VRF",
+    body: "Variable-refrigerant-flow and split systems: outdoor units on the roof, insulated refrigerant piping, and indoor units zone by zone — heating and cooling where each space needs it.",
+    items: ["VRF outdoor units", "Refrigerant piping", "Branch selector boxes", "Ceiling cassettes", "Ductless splits"],
+    source: "ops", // within the "Rooftop & split systems" HVAC scope [site]; AAM bids VRF systems [ops]
   },
   {
     id: "sheetmetal",
